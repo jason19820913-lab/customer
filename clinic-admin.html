@@ -7,7 +7,7 @@
 <script>
 // ── 內嵌設定（無需 config.js）──
 const APP_CONFIG = {
-  GAS_URL: 'https://script.google.com/macros/s/AKfycbwyR1ZBcNCR7yCJH8kmKHCJtB-jE3I2YV6uj-NXjVpCYlCJwV5zDSbBscUmZneOe_Ub/exec'
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbxAr-cNVq6jTNXSRi0MHYsxTOuDrWKsXDMThovhWKHsMYbLpzXDqS8sEqtOCglrH8vA/exec'
 };
 // 自動寫入 localStorage，確保所有裝置皆可使用
 try { localStorage.setItem('gsUrl', APP_CONFIG.GAS_URL); } catch(e) {}
@@ -528,6 +528,9 @@ function json(o) {
         <button class="btn btn-primary" onclick="saveGs()">儲存</button>
       </div>
       <div id="gsStatus"></div>
+      <button class="btn btn-outline" style="width:100%;margin-top:10px;" onclick="initApp()">
+        🔄 從 Google Sheet 重新同步所有資料
+      </button>
     </div>
 
     <!-- CLINICS -->
@@ -726,13 +729,78 @@ function checkPin(){
 function logout(){document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('appShell').classList.remove('visible');pinBuf='';updateDots();}
 
 // ── INIT ──
-function initApp(){
+async function initApp(){
+  // 立即用本機快取渲染，讓畫面先出現
   renderStats();
-  loadClinicData();loadStaffData();renderStaffLists();
+  loadClinicData(); loadStaffData(); renderStaffLists();
   renderProductManager();
-  const gsUrl = (typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.GAS_URL : null) || localStorage.getItem(GS_KEY) || '';
-  if (gsUrl) { document.getElementById('gsUrlInput').value=gsUrl; document.getElementById('gsBadge').classList.add('show'); }
+  loadPromoData(); loadCommData();
+  const u = gasUrl();
+  if(u){ document.getElementById('gsUrlInput').value=u; document.getElementById('gsBadge').classList.add('show'); }
   document.getElementById('statsDateLabel').textContent=new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'short'})+' 銷售概覽';
+
+  // 背景從 Sheet 拉取最新資料（全資料表一次拉）
+  if(!u) return;
+  try{
+    const [prodD, staffD, clinicD, promoD, commD] = await Promise.all([
+      gasRead('商品主檔'),
+      gasRead('人員名單'),
+      gasRead('院區清單'),
+      gasRead('促銷活動'),
+      gasRead('分潤規則'),
+    ]);
+
+    // 商品主檔
+    if(prodD.status==='ok' && prodD.rows?.length){
+      const products = prodD.rows.map(r=>({
+        ...r, price:Number(r.price)||0,
+        active: String(r.active).toUpperCase()!=='FALSE'
+      }));
+      localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
+      renderProductManager();
+    }
+
+    // 人員名單
+    if(staffD.status==='ok' && staffD.rows){
+      const staff={doctors:[],staff:[],nurses:[],pharmas:[]};
+      staffD.rows.forEach(r=>{
+        const role=r['角色'], name=String(r['姓名']||'').trim();
+        if(staff[role]!==undefined && name) staff[role].push(name);
+      });
+      editStaffData=staff;
+      localStorage.setItem(STAFF_KEY, JSON.stringify(staff));
+      renderStaffLists();
+    }
+
+    // 院區清單
+    if(clinicD.status==='ok' && clinicD.rows){
+      const clinics=clinicD.rows.map(r=>String(r['院區名稱']||'').trim()).filter(Boolean);
+      if(clinics.length){ editClinics=clinics; localStorage.setItem(CLINIC_KEY, JSON.stringify(clinics)); renderClinicChips(); }
+    }
+
+    // 促銷活動
+    if(promoD.status==='ok' && promoD.rows){
+      const promos=promoD.rows.map(r=>({...r,
+        buyQty:Number(r.buyQty)||0, freeQty:Number(r.freeQty)||0, discountValue:Number(r.discountValue)||0
+      }));
+      editPromos=promos;
+      localStorage.setItem(PROMO_KEY, JSON.stringify(promos));
+    }
+
+    // 分潤規則
+    if(commD.status==='ok' && commD.rows?.length){
+      editCommRules=commD.rows.map(r=>({...r,
+        doctorValue:Number(r.doctorValue)||0, staffValue:Number(r.staffValue)||0,
+        nurseValue:Number(r.nurseValue)||0,  pharmaValue:Number(r.pharmaValue)||0
+      }));
+      localStorage.setItem(COMM_KEY, JSON.stringify(editCommRules));
+    }
+
+    console.info('[initApp] 已從 Sheet 同步所有資料');
+    toast('☁️ 資料已從 Google Sheet 同步');
+  }catch(e){
+    console.warn('[initApp] Sheet 同步失敗，使用本機快取', e.message);
+  }
 }
 function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
 function switchPage(p){
