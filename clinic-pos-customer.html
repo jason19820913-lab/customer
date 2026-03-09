@@ -783,70 +783,76 @@ function closeDrawer(){document.getElementById('cartDrawer').classList.remove('o
 
 /* ── COMMISSIONS（動態分潤規則） ── */
 // 舊版硬碼備用（Sheet 無規則時 fallback）
-const COMM_FALLBACK={
-  '複方蛋白粉':{dr:100,st:20,nu:0,ph:0},'蛋白代餐':{dr:100,st:10,nu:0,ph:0},'Q飽纖燃飲':{dr:100,st:10,nu:0,ph:0},
-  '好燃對策':{dr:0,st:0,nu:0,ph:100},'碳水對策':{dr:0,st:0,nu:0,ph:100},
-  '好輕鬆':{dr:0,st:0,nu:0,ph:50},'好元氣':{dr:0,st:0,nu:0,ph:50},'甘好睡寶':{dr:0,st:0,nu:0,ph:100},
-  '中碳套組':{dr:100,st:10,nu:0,ph:0},'低碳套組':{dr:100,st:10,nu:0,ph:0},
-  '拿鐵蛋白棒':{dr:50,st:10,nu:0,ph:0},'健健粉':{dr:50,st:10,nu:0,ph:0},
-};
+// 分潤規則從後台/Google Sheet 設定，無硬碼預設
 
 function getCommRules(){
   try{const s=localStorage.getItem(COMM_KEY);return s?JSON.parse(s):[];}catch(e){return[];}
 }
 
-// 計算單一商品對某角色的分潤金額
-function calcRoleComm(rule, role, salePrice, qty){
-  const type = rule[role+'Type']||'fixed';
-  const val  = Number(rule[role+'Value'])||0;
-  if(type==='percent') return Math.round(salePrice * val / 100) * qty;
+// 計算單一規則的分潤金額（支援5種計算方式）
+function calcOneRule(rule, salePrice, qty, lineTotal){
+  const type  = rule.commType||'fixed';
+  const val   = Number(rule.commValue)||0;
+  const thres = Number(rule.commThreshold)||0;
+  if(type==='percent')     return Math.round(salePrice * val / 100) * qty;
+  if(type==='threshold')   return (lineTotal >= thres && thres > 0) ? val : 0;
+  if(type==='salesStage')  return (lineTotal >= thres && thres > 0) ? val : 0;
+  // 銷售金額×抽成：每 NT$thres 的銷售金額給 NT$val 抽成
+  // 例：每 NT$1000 給 NT$50 → 賣了 NT$3200 就給 NT$150
+  if(type==='salesAmount') return (thres > 0) ? Math.floor(lineTotal / thres) * val : 0;
   return val * qty;  // fixed
 }
 
-// 找適用規則：商品層級優先，其次分類預設
-function findCommRule(product){
+// 找適用規則（新格式）：每條規則 = 1 商品 + 1 角色
+// 回傳 [{role, commType, commValue, commThreshold}, ...]
+function findCommRulesForProduct(product){
   const rules = getCommRules();
-  // 1. 精確商品 id 或 name 匹配
-  let r = rules.find(x => x.productId===product.id || x.productName===product.name);
-  if(r) return r;
-  // 2. 分類預設（_cat_分類名）
-  r = rules.find(x => x.productId==='_cat_'+product.cat);
-  if(r) return r;
-  // 3. group 預設（_group_protein 等）
-  r = rules.find(x => x.productId==='_group_'+product.group);
-  return r || null;
+  const matched = [];
+  rules.forEach(r=>{
+    const pid = r.productId||'';
+    if(pid===product.id || pid==='_cat_'+product.cat ||
+       pid==='_group_'+product.group || pid==='_all_'){
+      matched.push(r);
+    }
+  });
+  // 同一角色取最精確的（商品 id > _cat_ > _group_ > _all_）
+  const priority = id => id===product.id?0:id.startsWith('_cat_')?1:id.startsWith('_group_')?2:3;
+  const byRole = {};
+  matched.forEach(r=>{
+    const existing = byRole[r.role];
+    if(!existing || priority(r.productId)<priority(existing.productId)) byRole[r.role]=r;
+  });
+  return Object.values(byRole);
 }
 
-function calcComm(itemsStr){
+// calcComm：有填報哪個角色就給哪個角色抽成，沒填就是 0
+function calcComm(itemsStr, hasDoctor, hasStaff, hasNurse, hasPharma){
   const products = getProducts();
   let dr=0,st=0,nu=0,ph=0;
   if(!itemsStr) return {dr,st,nu,ph};
-  const rules = getCommRules();
+
+  // 角色 key → 是否填報
+  const filled={doctor:hasDoctor, staff:hasStaff, nurse:hasNurse, pharma:hasPharma};
 
   itemsStr.split('、').forEach(part=>{
     const m=part.match(/^(.+?)×(\d+)/);if(!m)return;
     const rawName=m[1].trim(), qty=parseInt(m[2])||1;
-    // 找對應商品（支援蛋白代餐-巧克力 格式）
-    const shortName=rawName.replace(/^蛋白代餐-/,'').replace(/^Q飽-/,'');
+    const shortName=rawName.includes('-')?rawName.split('-').slice(1).join('-'):rawName;
     const product=products.find(p=>p.name===shortName||p.name===rawName);
+    if(!product) return;
 
-    if(product && rules.length){
-      const rule=findCommRule(product);
-      if(rule){
-        const price=product.price||0;
-        dr+=calcRoleComm(rule,'doctor',price,qty);
-        st+=calcRoleComm(rule,'staff',price,qty);
-        nu+=calcRoleComm(rule,'nurse',price,qty);
-        ph+=calcRoleComm(rule,'pharma',price,qty);
-        return;
-      }
-    }
-    // fallback 舊硬碼
-    for(const[k,r] of Object.entries(COMM_FALLBACK)){
-      if(rawName.includes(k)||k.includes(rawName)||shortName.includes(k)){
-        dr+=r.dr*qty;st+=r.st*qty;nu+=(r.nu||0)*qty;ph+=r.ph*qty;break;
-      }
-    }
+    const price=product.price||0;
+    const lineTotal=price*qty;
+    const matchedRules=findCommRulesForProduct(product);
+
+    matchedRules.forEach(rule=>{
+      if(!filled[rule.role]) return;  // 該角色沒填報，跳過
+      const amt=calcOneRule(rule, price, qty, lineTotal);
+      if(rule.role==='doctor') dr+=amt;
+      else if(rule.role==='staff')  st+=amt;
+      else if(rule.role==='nurse')  nu+=amt;
+      else if(rule.role==='pharma') ph+=amt;
+    });
   });
   return {dr,st,nu,ph};
 }
@@ -867,21 +873,28 @@ async function checkout(){
   const date=now.toLocaleDateString('zh-TW');
   const time=now.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
 
-  // items summary string
+  // items summary string（帶分類前綴）
   const parts=[];
-  ['protein','mct'].forEach(grp=>products.filter(p=>p.group===grp).forEach(p=>{if(cart[p.id]>0)parts.push(`${p.name}×${cart[p.id]}`);}));
-  products.filter(p=>!['protein','mct'].includes(p.group)).forEach(p=>{if(cart[p.id]>0)parts.push(`${p.name}×${cart[p.id]}`);});
+  products.forEach(p=>{
+    if(cart[p.id]>0) parts.push(`${p.cat?p.cat+'-':''}${p.name}×${cart[p.id]}`);
+  });
   const itemsStr=parts.join('、');
 
-  // per-flavour qty for sheets
+  // per-flavour qty for sheets（格式：分類-口味，方便辨識）
   const itemQty={};
   products.forEach(p=>{
     const q=cart[p.id]||0;if(!q)return;
-    const k=p.group==='protein'?`蛋白代餐-${p.name}`:p.group==='mct'?`Q飽-${p.name}`:p.name;
+    // 有分類名稱就加前綴，避免不同分類撞名
+    const k=p.cat?`${p.cat}-${p.name}`:p.name;
     itemQty[k]=q;
   });
 
-  const c=calcComm(itemsStr);
+  // 有填報的角色才計算抽成
+  const hasDoctor  = !!doctor;
+  const hasStaff   = !!staffV;
+  const hasNurse   = !!nurseV;
+  const hasPharma  = !!pharmaV;
+  const c=calcComm(itemsStr, hasDoctor, hasStaff, hasNurse, hasPharma);
   const entry={date,time,clinic,customer,phone:chartNum,doctor,staff:staffV,nurse:nurseV,pharma:pharmaV,
     items:itemsStr,itemQty,total,payMethod,
     doctorComm:c.dr,staffComm:c.st,nurseComm:c.nu,pharmaComm:c.ph,idHash:'',idMask:''};
@@ -908,7 +921,7 @@ async function checkout(){
   if(gasUrl()){
     try{
       const FIXED_FRONT=['日期','時間','院區','顧客姓名','身分證遮罩','病歷號','當班醫師','櫃檯人員'];
-      const FIXED_BACK=['結帳金額','付款方式','醫師抽成','員工抽成','藥師抽成','身分證雜湊'];
+      const FIXED_BACK=['結帳金額','付款方式','醫師抽成','櫃檯抽成','護理師抽成','藥師抽成','身分證雜湊'];
       const productCols=Object.keys(entry.itemQty||{});
       const allHeaders=[...FIXED_FRONT,...productCols,...FIXED_BACK];
       const row={
@@ -916,8 +929,8 @@ async function checkout(){
         '顧客姓名':entry.customer,'身分證遮罩':entry.idMask||'','病歷號':entry.phone||'',
         '當班醫師':entry.doctor,'櫃檯人員':entry.staff||'',
         '結帳金額':entry.total,'付款方式':entry.payMethod,
-        '醫師抽成':entry.doctorComm||0,'員工抽成':entry.staffComm||0,
-        '護理抽成':entry.nurseComm||0,'藥師抽成':entry.pharmaComm||0,'身分證雜湊':entry.idHash||'',
+        '醫師抽成':entry.doctorComm||0,'櫃檯抽成':entry.staffComm||0,
+        '護理師抽成':entry.nurseComm||0,'藥師抽成':entry.pharmaComm||0,'身分證雜湊':entry.idHash||'',
         ...entry.itemQty
       };
       const d=await gasAppend('銷售紀錄',allHeaders,row,productCols,'結帳金額');
