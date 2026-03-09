@@ -300,6 +300,7 @@ tbody tr:hover td{background:var(--sage-pale);}
       <div class="stat-card"><div class="stat-icon">🧾</div><div class="stat-num" id="statOrders">0</div><div class="stat-label">今日訂單數</div></div>
       <div class="stat-card"><div class="stat-icon">👨‍⚕️</div><div class="stat-num" id="statDr">NT$ 0</div><div class="stat-label">醫師抽成</div></div>
       <div class="stat-card"><div class="stat-icon">💁</div><div class="stat-num" id="statSt">NT$ 0</div><div class="stat-label">櫃檯抽成</div></div>
+      <div class="stat-card"><div class="stat-icon">👩‍⚕️</div><div class="stat-num" id="statNu">NT$ 0</div><div class="stat-label">護理師抽成</div></div>
       <div class="stat-card"><div class="stat-icon">💊</div><div class="stat-num" id="statPh">NT$ 0</div><div class="stat-label">藥師抽成</div></div>
     </div>
     <div class="section-title">
@@ -850,47 +851,69 @@ function getQty(e,key){
   return m?parseInt(m[1]):0;
 }
 
+// 從 entry 取得四個角色的抽成（有記錄就用記錄值，無則依分潤規則即時計算）
+function getEntryComm(e){
+  // 優先使用已記錄的抽成值（結帳時依人員填報計算）
+  if(e.doctorComm!==undefined||e.staffComm!==undefined||e.nurseComm!==undefined||e.pharmaComm!==undefined){
+    return {dr:e.doctorComm||0, st:e.staffComm||0, nu:e.nurseComm||0, ph:e.pharmaComm||0};
+  }
+  // fallback：依分潤規則即時計算（傳入人員填報狀態）
+  return calcComm(
+    e.items||'',
+    !!e.doctor, !!e.staff, !!e.nurse, !!e.pharma
+  );
+}
+
 function renderStats(){
   const allLog=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
   const log=activeCF?allLog.filter(e=>(e.clinic||'')===activeCF):allLog;
   const rev=log.reduce((s,e)=>s+(e.total||0),0);
   let tdr=0,tst=0,tnu=0,tph=0;
-  log.forEach(e=>{if(e.pharmaComm!==undefined){tdr+=e.doctorComm||0;tst+=e.staffComm||0;tnu+=e.nurseComm||0;tph+=e.pharmaComm||0;}else{const c=calcComm(e.items||'');tdr+=c.dr;tst+=c.st;tph+=c.ph;}});
+  log.forEach(e=>{const cm=getEntryComm(e);tdr+=cm.dr;tst+=cm.st;tnu+=cm.nu;tph+=cm.ph;});
+
   document.getElementById('statRev').textContent='NT$'+rev.toLocaleString();
   document.getElementById('statOrders').textContent=log.length;
   document.getElementById('statDr').textContent='NT$'+tdr.toLocaleString();
   document.getElementById('statSt').textContent='NT$'+tst.toLocaleString();
+  document.getElementById('statNu').textContent='NT$'+tnu.toLocaleString();
   document.getElementById('statPh').textContent='NT$'+tph.toLocaleString();
 
-  // Dynamic columns from current products
+  // 表格動態欄：從商品主檔讀取，格式 分類-名稱
   const products=getProducts().filter(p=>p.active!==false);
   const statKeys=[];
   products.forEach(p=>{
-    const k=p.group==='protein'?`蛋白代餐-${p.name}`:p.group==='mct'?`Q飽-${p.name}`:p.name;
+    const k=p.cat?`${p.cat}-${p.name}`:p.name;
     if(!statKeys.includes(k))statKeys.push(k);
   });
 
-  document.getElementById('statsHead').innerHTML=`<tr><th>時間</th><th>院區</th><th>顧客</th><th>醫師</th><th>人員</th>${statKeys.map(k=>`<th style="font-size:10px;white-space:nowrap;">${k.replace('蛋白代餐-','').replace('Q飽-','Q飽')}</th>`).join('')}<th>金額</th><th>付款</th><th>醫師抽</th><th>員工抽</th><th>藥師抽</th></tr>`;
+  document.getElementById('statsHead').innerHTML=`<tr>
+    <th>時間</th><th>院區</th><th>顧客</th><th>醫師</th><th>櫃檯</th><th>護理師</th>
+    ${statKeys.map(k=>`<th style="font-size:10px;white-space:nowrap;">${k}</th>`).join('')}
+    <th>金額</th><th>付款</th>
+    <th style="color:#7B6200;white-space:nowrap;">醫師抽成</th>
+    <th style="color:#7B6200;white-space:nowrap;">櫃檯抽成</th>
+    <th style="color:#7B6200;white-space:nowrap;">護理師抽成</th>
+    <th style="color:#7B6200;white-space:nowrap;">藥師抽成</th>
+  </tr>`;
 
   function qCell(q){return q?`<td style="text-align:center;"><strong style="color:var(--sage);">${q}</strong></td>`:`<td style="text-align:center;color:#ddd;">—</td>`;}
+  function commCell(v){return v?`<td style="white-space:nowrap;text-align:right;color:var(--brown);">NT$${v.toLocaleString()}</td>`:`<td style="text-align:center;color:#ddd;">—</td>`;}
 
   const tbody=document.getElementById('logBody');
-  if(!log.length){tbody.innerHTML=`<tr class="empty-row"><td colspan="${10+statKeys.length}">尚無銷售紀錄</td></tr>`;return;}
+  if(!log.length){tbody.innerHTML=`<tr class="empty-row"><td colspan="${13+statKeys.length}">尚無銷售紀錄</td></tr>`;return;}
   tbody.innerHTML=[...log].reverse().map(e=>{
-    let dr,st,ph;
-    if(e.pharmaComm!==undefined){dr=e.doctorComm||0;st=e.staffComm||0;nu=e.nurseComm||0;ph=e.pharmaComm||0;}else{const c=calcComm(e.items||'');dr=c.dr;st=c.st;nu=c.nu||0;ph=c.ph;}
+    const cm=getEntryComm(e);
     return`<tr>
-      <td style="white-space:nowrap;">${e.time}</td>
+      <td style="white-space:nowrap;">${e.time||''}</td>
       <td><span style="font-size:10px;background:var(--sage-pale);color:var(--sage);padding:2px 7px;border-radius:9px;font-weight:600;white-space:nowrap;">${e.clinic||'-'}</span></td>
-      <td><strong>${e.customer}</strong>${e.phone?`<br><span style="color:#aaa;font-size:9px;">病歷號：${e.phone}</span>`:''}</td>
-      <td style="white-space:nowrap;">${e.doctor}</td>
+      <td><strong>${e.customer||''}</strong>${e.phone?`<br><span style="color:#aaa;font-size:9px;">病歷號：${e.phone}</span>`:''}</td>
+      <td style="white-space:nowrap;">${e.doctor||'-'}</td>
       <td style="white-space:nowrap;">${e.staff||'-'}</td>
+      <td style="white-space:nowrap;">${e.nurse||'-'}</td>
       ${statKeys.map(k=>qCell(getQty(e,k))).join('')}
       <td style="white-space:nowrap;"><strong style="color:var(--sage);">NT$${(e.total||0).toLocaleString()}</strong></td>
       <td><span class="tag ${e.payMethod==='cash'?'tag-cash':'tag-transfer'}">${e.payMethod==='cash'?'現金':'轉帳'}</span></td>
-      <td style="color:var(--brown);white-space:nowrap;">${dr?'NT$'+dr.toLocaleString():'-'}</td>
-      <td style="color:var(--brown);white-space:nowrap;">${st?'NT$'+st.toLocaleString():'-'}</td>
-      <td style="color:var(--purple);white-space:nowrap;">${ph?'NT$'+ph.toLocaleString():'-'}</td>
+      ${commCell(cm.dr)}${commCell(cm.st)}${commCell(cm.nu)}${commCell(cm.ph)}
     </tr>`;
   }).join('');
 }
