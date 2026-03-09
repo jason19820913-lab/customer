@@ -1,0 +1,1679 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>擇木良食 × 金鶯診所｜後台管理</title>
+<script>
+// ── 內嵌設定（無需 config.js）──
+const APP_CONFIG = {
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbwyR1ZBcNCR7yCJH8kmKHCJtB-jE3I2YV6uj-NXjVpCYlCJwV5zDSbBscUmZneOe_Ub/exec'
+};
+// 自動寫入 localStorage，確保所有裝置皆可使用
+try { localStorage.setItem('gsUrl', APP_CONFIG.GAS_URL); } catch(e) {}
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --sage:#6B8F71;--sage-light:#A8C5AD;--sage-pale:#E8F2EA;
+  --cream:#F9F5EE;--warm:#FEFCF8;--charcoal:#2C3E35;
+  --brown:#8B7355;--gold:#C9A84C;--red:#D4756A;--purple:#7B5EA7;
+  --sh-sm:0 2px 8px rgba(44,62,53,.08);--sh-md:0 4px 20px rgba(44,62,53,.12);
+  --r:14px;--r-sm:10px;
+  --hh:60px;--nh:44px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow-x:hidden;}
+body{font-family:'Noto Sans TC',sans-serif;background:var(--cream);color:var(--charcoal);}
+
+/* ── LOGIN ── */
+.login-screen{position:fixed;inset:0;background:linear-gradient(135deg,var(--charcoal),#1A2A22);display:flex;align-items:center;justify-content:center;z-index:500;transition:opacity .4s;}
+.login-screen.hidden{opacity:0;pointer-events:none;}
+.login-box{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:22px;padding:38px 36px 30px;width:min(340px,90vw);text-align:center;backdrop-filter:blur(10px);box-shadow:0 20px 60px rgba(0,0,0,.4);}
+.login-logo{font-size:38px;margin-bottom:14px;}
+.login-title{color:#fff;font-size:17px;font-weight:700;margin-bottom:3px;letter-spacing:1px;}
+.login-sub{color:var(--sage-light);font-size:11px;margin-bottom:24px;}
+.pin-display{display:flex;justify-content:center;gap:10px;margin-bottom:20px;}
+.pin-dot{width:13px;height:13px;border-radius:50%;border:2px solid rgba(255,255,255,.3);background:transparent;transition:all .2s;}
+.pin-dot.filled{background:var(--sage-light);border-color:var(--sage-light);}
+.pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
+.pin-btn{height:52px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.07);color:#fff;font-family:inherit;font-size:19px;font-weight:600;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;}
+.pin-btn:hover{background:rgba(255,255,255,.15);}
+.pin-btn:active{transform:scale(.93);}
+.pin-btn.del{font-size:17px;color:var(--sage-light);}
+.pin-error{color:#FF8A80;font-size:11px;height:14px;margin-top:4px;}
+.pin-hint{color:rgba(255,255,255,.3);font-size:10px;margin-top:12px;}
+
+/* ── APP SHELL ── */
+.app-shell{display:none;}
+.app-shell.visible{display:block;}
+
+/* ── HEADER ── */
+header{background:var(--charcoal);height:var(--hh);padding:0 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.25);}
+.brand{display:flex;align-items:center;gap:9px;}
+.brand-icon{width:30px;height:30px;background:var(--sage);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.brand h1{color:#fff;font-size:13px;font-weight:700;letter-spacing:1px;line-height:1.2;}
+.brand p{color:var(--sage-light);font-size:10px;}
+.hdr-right{display:flex;align-items:center;gap:8px;}
+.admin-badge{background:rgba(201,168,76,.2);color:var(--gold);border:1px solid rgba(201,168,76,.3);padding:3px 10px;border-radius:14px;font-size:10px;font-weight:700;letter-spacing:.8px;}
+.gs-badge{display:none;align-items:center;gap:5px;background:#E8F5E9;color:#2E7D32;padding:3px 10px;border-radius:14px;font-size:10px;font-weight:700;}
+.gs-badge.show{display:inline-flex;}
+.logout-btn{background:none;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.6);padding:4px 12px;border-radius:14px;font-family:inherit;font-size:10px;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.logout-btn:hover{border-color:rgba(255,255,255,.5);color:#fff;}
+
+/* ── NAV ── */
+.nav-bar{background:#1E2E26;display:flex;overflow-x:auto;scrollbar-width:none;padding:0 12px;}
+.nav-bar::-webkit-scrollbar{display:none;}
+.nav-tab{padding:0 14px;height:var(--nh);display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:rgba(255,255,255,.5);cursor:pointer;border-bottom:3px solid transparent;transition:all .2s;white-space:nowrap;flex-shrink:0;}
+.nav-tab:hover{color:rgba(255,255,255,.8);}
+.nav-tab.active{color:#fff;border-bottom-color:var(--sage-light);}
+
+/* ── PAGE ── */
+.page{display:none;padding:18px 14px;}
+.page.active{display:block;}
+@media(min-width:768px){.page{padding:22px 26px;}}
+.page-title{font-size:16px;font-weight:700;margin-bottom:3px;}
+.page-sub{font-size:11px;color:#888;margin-bottom:18px;}
+
+/* ── STAT GRID ── */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}
+@media(min-width:600px){.stat-grid{grid-template-columns:repeat(3,1fr);}}
+@media(min-width:900px){.stat-grid{grid-template-columns:repeat(5,1fr);}}
+.stat-card{background:#fff;border-radius:var(--r);padding:14px 16px;border:1px solid #E8EEE9;box-shadow:var(--sh-sm);}
+.stat-icon{font-size:22px;margin-bottom:7px;}
+.stat-num{font-size:20px;font-weight:900;color:var(--sage);}
+.stat-label{font-size:10px;color:#888;margin-top:2px;}
+
+/* ── TABLE ── */
+.tbl-wrap{overflow-x:auto;border-radius:var(--r);box-shadow:var(--sh-sm);}
+table{width:100%;border-collapse:collapse;background:#fff;}
+thead th{background:var(--sage-pale);padding:9px 12px;font-size:11px;font-weight:700;color:var(--charcoal);text-align:left;letter-spacing:.3px;white-space:nowrap;}
+tbody td{padding:9px 12px;font-size:11px;border-bottom:1px solid #F0F4F1;color:var(--charcoal);}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr:hover td{background:var(--sage-pale);}
+.tag{display:inline-block;padding:2px 8px;border-radius:9px;font-size:9px;font-weight:700;}
+.tag-cash{background:#E8F5E9;color:#2E7D32;}
+.tag-transfer{background:#E3F2FD;color:#1565C0;}
+.empty-row td{text-align:center;color:#aaa;padding:24px!important;font-size:12px;}
+
+/* ── SECTION TITLE ── */
+.section-title{font-size:13px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+
+/* ── BUTTONS ── */
+.btn{height:36px;padding:0 16px;border:none;border-radius:var(--r-sm);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.btn-primary{background:var(--sage);color:#fff;}
+.btn-primary:hover{background:#5A7B60;}
+.btn-outline{background:#fff;color:var(--sage);border:2px solid var(--sage);}
+.btn-outline:hover{background:var(--sage-pale);}
+.btn-red{background:#fff;color:var(--red);border:1.5px solid #E8EEE9;}
+.btn-red:hover{border-color:var(--red);}
+.btn-sm{height:30px;padding:0 12px;border-radius:8px;border:1.5px solid #D0DEAD;background:#fff;font-family:inherit;font-size:11px;cursor:pointer;color:#888;transition:all .2s;}
+.btn-sm:hover{border-color:var(--red);color:var(--red);}
+.btn-sm.primary{background:var(--sage);border-color:var(--sage);color:#fff;}
+.btn-sm.primary:hover{background:#5A7B60;}
+
+/* ── CLINIC FILTER ── */
+.clinic-filter-btn{padding:4px 11px;border-radius:14px;border:1.5px solid #D0DEAD;background:#fff;font-family:inherit;font-size:11px;font-weight:500;color:var(--brown);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.clinic-filter-btn:hover{border-color:var(--sage);color:var(--sage);}
+.clinic-filter-btn.active{background:var(--sage);border-color:var(--sage);color:#fff;}
+
+/* ── SETTINGS CARD ── */
+.sc{background:#fff;border-radius:var(--r);border:1px solid #E8EEE9;box-shadow:var(--sh-sm);padding:20px;margin-bottom:16px;}
+.sc h3{font-size:13px;font-weight:700;margin-bottom:5px;display:flex;align-items:center;gap:7px;}
+.sc p{font-size:11px;color:#888;line-height:1.7;margin-bottom:14px;}
+.fg{display:flex;flex-direction:column;gap:4px;}
+.fg label{font-size:10px;font-weight:700;color:var(--brown);letter-spacing:.5px;}
+.fg input,.fg select{height:36px;width:100%;border:1.5px solid #D8E8DA;border-radius:var(--r-sm);padding:0 10px;font-family:inherit;font-size:12px;outline:none;background:var(--cream);transition:border-color .2s;}
+.fg input:focus,.fg select:focus{border-color:var(--sage);background:#fff;}
+.input-row{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;}
+.input-row .fg{flex:1;min-width:180px;}
+.status-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:16px;font-size:11px;font-weight:600;margin-top:8px;}
+.pill-ok{background:#E8F5E9;color:#2E7D32;}
+.pill-err{background:#FDECEA;color:#C62828;}
+.pill-pending{background:#FFF8E1;color:#F57F17;}
+
+/* GUIDE */
+.guide-step{display:flex;gap:10px;margin-bottom:12px;align-items:flex-start;}
+.gnum{width:22px;height:22px;border-radius:50%;background:var(--sage);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.gtext{font-size:11px;color:#444;line-height:1.6;}
+
+/* CODE BLOCK */
+.code-block{background:#1E1E2E;color:#CDD6F4;border-radius:var(--r-sm);padding:14px;font-family:'Courier New',monospace;font-size:10px;line-height:1.7;overflow-x:auto;margin:10px 0;position:relative;}
+.kw{color:#CBA6F7}.str{color:#A6E3A1}.fn{color:#89B4FA}.cm{color:#6C7086}
+.copy-btn{position:absolute;top:8px;right:8px;background:rgba(255,255,255,.1);color:#CDD6F4;border:1px solid rgba(255,255,255,.2);border-radius:5px;padding:2px 8px;font-size:9px;cursor:pointer;font-family:inherit;}
+.copy-btn:hover{background:rgba(255,255,255,.2);}
+
+/* STAFF CHIPS */
+.staff-add-row{display:flex;gap:7px;margin-bottom:8px;}
+.staff-add-row input{flex:1;height:34px;border:1.5px solid #D8E8DA;border-radius:var(--r-sm);padding:0 10px;font-family:inherit;font-size:12px;outline:none;background:var(--cream);}
+.staff-add-row input:focus{border-color:var(--sage);background:#fff;}
+.chip-list{display:flex;flex-wrap:wrap;gap:6px;max-height:160px;overflow-y:auto;padding:2px;}
+.chip{display:inline-flex;align-items:center;gap:5px;background:var(--sage-pale);color:var(--charcoal);border:1px solid #C5DEC8;padding:4px 10px;border-radius:16px;font-size:11px;font-weight:500;}
+.chip-del{background:none;border:none;color:#aaa;cursor:pointer;font-size:13px;line-height:1;padding:0;transition:color .15s;}
+.chip-del:hover{color:var(--red);}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:520px){.two-col{grid-template-columns:1fr;}}
+
+/* READER */
+.reader-bar{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #E8EEE9;border-radius:var(--r);padding:14px 16px;margin-bottom:14px;box-shadow:var(--sh-sm);flex-wrap:wrap;}
+.reader-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:18px;font-size:11px;font-weight:600;transition:all .3s;flex-shrink:0;}
+.reader-pill.off{background:#F0F0F0;color:#aaa;}
+.reader-pill.connecting{background:#FFF8E1;color:#F9A825;}
+.reader-pill.ready{background:#E8F5E9;color:#2E7D32;}
+.reader-pill.reading{background:#E3F2FD;color:#1565C0;animation:rp 1s infinite;}
+.reader-pill.error{background:#FFEBEE;color:#C62828;}
+@keyframes rp{0%,100%{opacity:1}50%{opacity:.5}}
+.reader-dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0;}
+.read-card-btn{height:36px;padding:0 14px;background:linear-gradient(135deg,#4A9B8E,var(--sage));color:#fff;border:none;border-radius:var(--r-sm);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .2s;box-shadow:0 2px 8px rgba(74,155,142,.3);white-space:nowrap;}
+.read-card-btn:hover:not(:disabled){transform:translateY(-1px);}
+.read-card-btn:disabled{opacity:.4;cursor:not-allowed;}
+.id-manual-wrap{display:flex;gap:7px;align-items:center;flex:1;min-width:200px;}
+.id-manual-wrap input{flex:1;height:36px;border:1.5px solid #D8E8DA;border-radius:var(--r-sm);padding:0 12px;font-family:inherit;font-size:13px;font-weight:600;letter-spacing:2px;background:var(--cream);outline:none;text-transform:uppercase;}
+.id-manual-wrap input:focus{border-color:var(--sage);background:#fff;}
+
+/* ── PRODUCT MANAGEMENT ── */
+.pm-grid{display:grid;grid-template-columns:1fr;gap:0;border-radius:var(--r);overflow:hidden;border:1px solid #E8EEE9;box-shadow:var(--sh-sm);}
+.pm-cat-header{background:var(--sage-pale);padding:10px 14px;font-size:12px;font-weight:700;border-bottom:1px solid #D8EAD9;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;}
+.pm-cat-body{background:#fff;}
+.pm-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #F0F4F1;transition:background .15s;}
+.pm-item:last-child{border-bottom:none;}
+.pm-item:hover{background:var(--sage-pale);}
+.pm-item.inactive{opacity:.5;}
+.pm-item[draggable="true"]{user-select:none;}
+.pm-item.drag-over{border-top:2px solid var(--sage);background:var(--sage-pale);}
+.pm-cat-body.drag-over-body{background:var(--sage-pale);outline:2px dashed var(--sage-light);}
+.pm-drag{cursor:grab;color:#ccc;font-size:16px;flex-shrink:0;}
+.pm-drag:active{cursor:grabbing;}
+.pm-emoji{font-size:20px;width:28px;text-align:center;flex-shrink:0;}
+.pm-info{flex:1;min-width:0;}
+.pm-name{font-size:12px;font-weight:600;}
+.pm-cat-tag{font-size:10px;color:var(--sage);background:var(--sage-pale);padding:1px 7px;border-radius:8px;margin-left:5px;}
+.pm-price{font-size:12px;font-weight:700;color:var(--sage);white-space:nowrap;flex-shrink:0;}
+.pm-toggle{width:38px;height:20px;border-radius:10px;background:#ccc;border:none;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0;}
+.pm-toggle.on{background:var(--sage);}
+.pm-toggle::after{content:'';position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2);}
+.pm-toggle.on::after{transform:translateX(18px);}
+.pm-edit-btn{background:none;border:1.5px solid #E8EEE9;color:var(--brown);font-size:10px;border-radius:7px;padding:3px 9px;cursor:pointer;white-space:nowrap;transition:all .2s;font-family:inherit;}
+.pm-edit-btn:hover{border-color:var(--sage);color:var(--sage);}
+.pm-del-btn{background:none;border:none;color:#ddd;font-size:16px;cursor:pointer;flex-shrink:0;transition:color .2s;line-height:1;padding:0 2px;}
+.pm-del-btn:hover{color:var(--red);}
+.pm-add-row{padding:10px 14px;background:var(--warm);border-top:2px dashed #D8E8DA;}
+
+/* Product modal */
+.pm-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:14px;}
+.pm-modal-overlay.open{display:flex;}
+.pm-modal{background:#fff;border-radius:18px;padding:22px 20px;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.25);animation:mIn .3s ease;}
+@keyframes mIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+.pm-modal h3{font-size:15px;font-weight:700;margin-bottom:16px;}
+.pm-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.pm-form-grid.full{grid-template-columns:1fr;}
+.pm-modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+
+/* TOAST */
+.toast-wrap{position:fixed;top:68px;right:12px;z-index:600;display:flex;flex-direction:column;gap:5px;pointer-events:none;}
+.toast{background:var(--charcoal);color:#fff;padding:8px 13px;border-radius:var(--r-sm);font-size:11px;font-weight:500;box-shadow:var(--sh-md);animation:tIn .3s ease,tOut .3s ease 2.5s forwards;pointer-events:all;}
+@keyframes tIn{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:translateX(0)}}
+@keyframes tOut{from{opacity:1}to{opacity:0}}
+</style>
+</head>
+<body>
+<div class="toast-wrap" id="toastWrap"></div>
+
+<!-- LOGIN -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">🔐</div>
+    <div class="login-title">工作人員後台</div>
+    <div class="login-sub">請輸入 PIN 碼進入管理系統</div>
+    <div class="pin-display">
+      <div class="pin-dot" id="d0"></div><div class="pin-dot" id="d1"></div>
+      <div class="pin-dot" id="d2"></div><div class="pin-dot" id="d3"></div>
+    </div>
+    <div class="pin-grid">
+      <button class="pin-btn" onclick="pinInput('1')">1</button>
+      <button class="pin-btn" onclick="pinInput('2')">2</button>
+      <button class="pin-btn" onclick="pinInput('3')">3</button>
+      <button class="pin-btn" onclick="pinInput('4')">4</button>
+      <button class="pin-btn" onclick="pinInput('5')">5</button>
+      <button class="pin-btn" onclick="pinInput('6')">6</button>
+      <button class="pin-btn" onclick="pinInput('7')">7</button>
+      <button class="pin-btn" onclick="pinInput('8')">8</button>
+      <button class="pin-btn" onclick="pinInput('9')">9</button>
+      <button class="pin-btn del" onclick="pinDel()">⌫</button>
+      <button class="pin-btn" onclick="pinInput('0')">0</button>
+      <button class="pin-btn del" onclick="pinClear()">✕</button>
+    </div>
+    <div class="pin-error" id="pinError"></div>
+    <div class="pin-hint">預設 PIN：1234（可在後台設定中修改）</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app-shell" id="appShell">
+  <header>
+    <div class="brand">
+      <div class="brand-icon">🌿</div>
+      <div><h1>擇木良食 × 金鶯診所</h1><p>後台管理系統</p></div>
+    </div>
+    <div class="hdr-right">
+      <span class="admin-badge">👔 ADMIN</span>
+      <span class="gs-badge" id="gsBadge">🟢 Sheets</span>
+      <button class="logout-btn" onclick="logout()">登出</button>
+    </div>
+  </header>
+
+  <div class="nav-bar">
+    <div class="nav-tab active" onclick="switchPage('stats')"  id="navStats">📊 銷售統計</div>
+    <div class="nav-tab"        onclick="switchPage('patient')" id="navPatient">🪪 顧客查詢</div>
+    <div class="nav-tab"        onclick="switchPage('products')" id="navProducts">🛍️ 商品管理</div>
+    <div class="nav-tab"        onclick="switchPage('promos')"   id="navPromos">🏷️ 促銷活動</div>
+    <div class="nav-tab"        onclick="switchPage('comm')"     id="navComm">💰 分潤設定</div>
+    <div class="nav-tab"        onclick="switchPage('settings')" id="navSettings">⚙️ 系統設定</div>
+  </div>
+
+  <!-- ── STATS PAGE ── -->
+  <div class="page active" id="pageStats">
+    <div class="page-title">銷售統計</div>
+    <div class="page-sub" id="statsDateLabel">今日銷售概覽</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+      <span style="font-size:11px;font-weight:700;color:var(--brown);">篩選：</span>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;" id="clinicFilterBtns">
+        <button class="clinic-filter-btn active" onclick="filterClinic('',this)">全部</button>
+        <button class="clinic-filter-btn" onclick="filterClinic('鶯歌院區',this)">鶯歌</button>
+        <button class="clinic-filter-btn" onclick="filterClinic('三樹院區',this)">三樹</button>
+        <button class="clinic-filter-btn" onclick="filterClinic('樹林院區',this)">樹林</button>
+        <button class="clinic-filter-btn" onclick="filterClinic('桃園院區',this)">桃園</button>
+        <button class="clinic-filter-btn" onclick="filterClinic('土城院區',this)">土城</button>
+        <button class="clinic-filter-btn" onclick="filterClinic('八德院區',this)">八德</button>
+        <button class="clinic-filter-btn" onclick="filterClinic('龍潭院區',this)">龍潭</button>
+        <button class="clinic-filter-btn" onclick="filterClinic('大溪院區',this)">大溪</button>
+        <button class="clinic-filter-btn" onclick="filterClinic('大竹院區',this)">大竹</button>
+        <button class="clinic-filter-btn" onclick="filterClinic('大浦院區',this)">大浦</button>
+        <button class="clinic-filter-btn" onclick="filterClinic('平鎮院區',this)">平鎮</button>
+        <button class="clinic-filter-btn" onclick="filterClinic('埔心院區',this)">埔心</button>
+      </div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-num" id="statRev">NT$ 0</div><div class="stat-label">今日總營收</div></div>
+      <div class="stat-card"><div class="stat-icon">🧾</div><div class="stat-num" id="statOrders">0</div><div class="stat-label">今日訂單數</div></div>
+      <div class="stat-card"><div class="stat-icon">👨‍⚕️</div><div class="stat-num" id="statDr">NT$ 0</div><div class="stat-label">醫師抽成</div></div>
+      <div class="stat-card"><div class="stat-icon">💁</div><div class="stat-num" id="statSt">NT$ 0</div><div class="stat-label">員工抽成</div></div>
+      <div class="stat-card"><div class="stat-icon">💊</div><div class="stat-num" id="statPh">NT$ 0</div><div class="stat-label">藥師抽成</div></div>
+    </div>
+    <div class="section-title">
+      <span>訂單明細</span>
+      <button class="btn-sm" onclick="clearLog()">🗑️ 清除紀錄</button>
+    </div>
+    <div class="tbl-wrap">
+      <table id="statsTable" style="min-width:900px;">
+        <thead id="statsHead"></thead>
+        <tbody id="logBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── PATIENT PAGE ── -->
+  <div class="page" id="pagePatient">
+    <div class="page-title">顧客購買歷程查詢</div>
+    <div class="page-sub">刷健保卡或手動輸入身分證字號，查詢跨院區完整購買紀錄</div>
+    <div class="reader-bar">
+      <div class="reader-pill off" id="adminReaderPill">
+        <span class="reader-dot"></span><span id="adminReaderText">讀卡機未連線</span>
+      </div>
+      <button class="read-card-btn" id="adminReadBtn" onclick="adminTriggerCard()" disabled>💳 刷健保卡查詢</button>
+      <span style="color:#ccc;font-size:11px;flex-shrink:0;">或</span>
+      <div class="id-manual-wrap">
+        <input type="text" id="adminIdInput" placeholder="手動輸入身分證字號" maxlength="10"
+          oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')adminLookup()">
+        <button class="btn btn-primary" onclick="adminLookup()">🔍 查詢</button>
+        <button class="btn btn-outline" onclick="adminClearLookup()">清除</button>
+      </div>
+    </div>
+    <div id="adminLookupStatus" style="font-size:11px;color:#888;margin-bottom:10px;min-height:16px;"></div>
+    <div id="adminPatientResult" style="display:none;">
+      <div style="background:#fff;border-radius:var(--r);border:1px solid #E8EEE9;box-shadow:var(--sh-sm);overflow:hidden;">
+        <div id="adminPatientHeader" style="background:var(--sage-pale);padding:14px 18px;border-bottom:1px solid #D8EAD9;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;"></div>
+        <div class="tbl-wrap"><table style="min-width:600px;"><thead id="patientThead"><tr></tr></thead><tbody id="adminPatientBody"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PRODUCTS PAGE ── -->
+  <div class="page" id="pageProducts">
+    <div class="page-title">商品管理</div>
+    <div class="page-sub">上架、下架商品與口味，儲存後前台即時更新</div>
+
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+      <button class="btn btn-primary" onclick="openProductModal()">＋ 新增商品／口味</button>
+      <button class="btn btn-outline" onclick="resetProducts()">↺ 重置為預設</button>
+      <span style="font-size:11px;color:#888;">共 <strong id="pmCount">0</strong> 項商品</span>
+    </div>
+
+    <div id="pmList"></div>
+  </div>
+
+  <!-- ── SETTINGS PAGE ── -->
+
+  <div class="page" id="pagePromos">
+    <div class="page-title"><div class="page-icon">🏷️</div><div><div class="page-h">促銷活動</div><div class="page-sub">管理折扣與買N送N活動，儲存後自動同步至 Google Sheet</div></div></div>
+
+    <div class="sc">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+        <h3 style="margin:0;">🏷️ 目前活動</h3>
+        <button class="btn btn-primary" onclick="openPromoModal()">＋ 新增活動</button>
+      </div>
+      <div id="promoList">
+        <div style="text-align:center;padding:40px;color:#aaa;">載入中...</div>
+      </div>
+    </div>
+
+    <!-- 促銷說明 -->
+    <div class="sc" style="background:#FFF8E1;border:1px solid #ECD9A0;">
+      <h3>📖 活動類型說明</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12px;">
+        <div><strong>🎁 買N送N</strong><br>買滿N個免費送N個，自動計算組數與散裝。<br><span style="color:#888;">例：買6送1，7包只收6包錢</span></div>
+        <div><strong>💰 固定金額折扣</strong><br>結帳時直接折抵固定金額。<br><span style="color:#888;">例：滿額折50元</span></div>
+        <div><strong>📉 百分比折扣</strong><br>依商品小計打折。<br><span style="color:#888;">例：9折 → discountValue填90</span></div>
+        <div><strong>📦 套組定價</strong><br>指定商品以固定套組價販售。<br><span style="color:#888;">例：中碳套組固定1000元</span></div>
+      </div>
+      <div style="margin-top:12px;font-size:11px;color:#888;">
+        <strong>scope 適用範圍：</strong><br>
+        <code>all</code> 全部商品 ／ <code>group:protein</code> 蛋白代餐群組 ／ <code>group:mct</code> Q飽群組 ／ <code>id:p1,p2</code> 指定商品ID
+      </div>
+    </div>
+  </div>
+
+
+  <div class="page" id="pageComm">
+    <div class="page-title"><div class="page-icon">💰</div><div><div class="page-h">分潤設定</div><div class="page-sub">設定各商品對醫師、員工、護理師、藥師的分潤，儲存後自動同步 Google Sheet</div></div></div>
+
+    <div class="sc">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+        <h3 style="margin:0;">💰 分潤規則</h3>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-outline" onclick="openCommModal()">＋ 新增規則</button>
+          <button class="btn btn-outline" onclick="initDefaultComm()">載入預設規則</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#888;margin-bottom:12px;">
+        💡 <strong>商品層級優先</strong>，沒設定的商品會往上找「分類預設（_cat_分類名）」或「群組預設（_group_protein）」
+      </div>
+      <div id="commList"><div style="text-align:center;padding:30px;color:#aaa;">載入中...</div></div>
+    </div>
+
+    <div class="sc" style="background:#EFF7F0;border:1px solid #C5DEC8;">
+      <h3>📖 設定說明</h3>
+      <div style="font-size:12px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div><strong>productId 填法</strong><br>
+          • 商品 id（如 <code>p1</code>）→ 指定商品<br>
+          • <code>_cat_蛋白代餐</code> → 分類預設<br>
+          • <code>_group_protein</code> → 群組預設</div>
+        <div><strong>commType 填法</strong><br>
+          • <code>fixed</code> → 每賣一個固定抽 X 元<br>
+          • <code>percent</code> → 售價的 X%（如填10=10%）</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="pageSettings">
+    <div class="page-title">系統設定</div>
+    <div class="page-sub">Google Sheets 串接、人員名單、PIN 碼</div>
+
+    <!-- GS -->
+    <div class="sc">
+      <h3>📋 Google Sheets 串接設定</h3>
+      <p>結帳後系統將自動把每筆訂單傳送至 Google 試算表。請依步驟完成設定：</p>
+      <div style="margin-bottom:14px;">
+        <div class="guide-step"><div class="gnum">1</div><div class="gtext">開啟您的 <strong>Google 試算表</strong> → 「擴充功能」→「Apps Script」</div></div>
+        <div class="guide-step"><div class="gnum">2</div><div class="gtext">複製下方程式碼，全部取代原有內容後儲存</div></div>
+        <div class="guide-step"><div class="gnum">3</div><div class="gtext">「部署」→「新增部署作業」→ 類型：<strong>網頁應用程式</strong>，存取權限：<strong>所有人</strong></div></div>
+        <div class="guide-step"><div class="gnum">4</div><div class="gtext">複製部署後的 URL，貼入下方並儲存</div></div>
+      </div>
+      <div style="font-size:10px;font-weight:700;color:#888;margin-bottom:5px;letter-spacing:.5px;">📄 APPS SCRIPT 程式碼（通用版 — 只需部署一次）</div>
+      <div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:11px;color:#1B5E20;">
+        ✅ <strong>通用版</strong>：GAS 不含任何商品/人員/院區邏輯，之後不論怎麼新增功能都<strong>不需要重新部署</strong>
+      </div>
+      <div class="code-block" style="max-height:300px;overflow-y:auto;">
+        <button class="copy-btn" onclick="copyScript()">複製</button>
+// 擇木良食 × 金鶯診所｜通用版 GAS（只需部署一次，永遠不用改）
+// ─────────────────────────────────────────────────────────────
+// doGet?sheet=工作頁名稱           → 讀取整頁所有資料（JSON）
+// doPost {sheet, headers, rows}    → 覆寫整頁（商品/人員/院區）
+// doPost {sheet, row, append:true} → 新增一列（銷售記錄）
+// ─────────────────────────────────────────────────────────────
+// 工作頁名稱（前後台 JS 定義，GAS 完全不需知道）：
+//   銷售紀錄 / 商品主檔 / 人員名單 / 院區清單
+
+function getOrCreate(name, headers) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let s = ss.getSheetByName(name);
+  if (!s) {
+    s = ss.insertSheet(name);
+    if (headers &amp;&amp; headers.length) {
+      s.appendRow(headers);
+      s.getRange(&#x27;1:1&#x27;).setFontWeight(&#x27;bold&#x27;).setBackground(&#x27;#2C3E35&#x27;).setFontColor(&#x27;#fff&#x27;);
+      s.setFrozenRows(1);
+    }
+  }
+  return s;
+}
+
+function doGet(e) {
+  try {
+    const name = (e.parameter || {}).sheet || &#x27;&#x27;;
+    // ping 測試：無 sheet 參數時直接回傳連線成功
+    if (!name) return json({ status: &#x27;ok&#x27;, msg: &#x27;連線成功（通用版 GAS）&#x27; });
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const s = ss.getSheetByName(name);
+    if (!s) return json({ status: &#x27;ok&#x27;, rows: [] });
+    const values = s.getDataRange().getValues();
+    const headers = values[0] || [];
+    const rows = values.slice(1).map(r =&gt; {
+      const o = {};
+      headers.forEach((h, i) =&gt; o[h] = r[i]);
+      return o;
+    });
+    return json({ status: &#x27;ok&#x27;, headers, rows });
+  } catch (err) { return json({ status: &#x27;error&#x27;, msg: err.message }); }
+}
+
+function doPost(e) {
+  try {
+    const d = JSON.parse(e.postData.contents);
+    const s = getOrCreate(d.sheet, d.headers || []);
+
+    if (d.append) {
+      // 新增一列模式（銷售記錄）
+      const headers = s.getRange(1, 1, 1, Math.max(s.getLastColumn(), 1)).getValues()[0];
+      // 自動新增尚未存在的商品欄位
+      if (d.ensureCols) {
+        d.ensureCols.forEach(col =&gt; {
+          if (!headers.includes(col)) {
+            const idx = headers.indexOf(d.insertBefore || &#x27;結帳金額&#x27;);
+            const at = (idx &gt;= 0 ? idx : headers.length) + 1;
+            s.insertColumnBefore(at);
+            s.getRange(1, at).setValue(col)
+              .setFontWeight(&#x27;bold&#x27;).setBackground(&#x27;#2C3E35&#x27;).setFontColor(&#x27;#fff&#x27;);
+            headers.splice(at - 1, 0, col);
+          }
+        });
+      }
+      s.appendRow(headers.map(h =&gt; d.row[h] !== undefined ? d.row[h] : &#x27;&#x27;));
+      return json({ status: &#x27;ok&#x27; });
+    }
+
+    // 覆寫整頁模式（商品 / 人員 / 院區）
+    s.clearContents();
+    if (d.headers &amp;&amp; d.headers.length) {
+      s.appendRow(d.headers);
+      s.getRange(&#x27;1:1&#x27;).setFontWeight(&#x27;bold&#x27;).setBackground(&#x27;#2C3E35&#x27;).setFontColor(&#x27;#fff&#x27;);
+      s.setFrozenRows(1);
+    }
+    (d.rows || []).forEach(row =&gt; {
+      s.appendRow((d.headers || []).map(h =&gt; row[h] !== undefined ? row[h] : &#x27;&#x27;));
+    });
+    return json({ status: &#x27;ok&#x27;, count: (d.rows || []).length });
+  } catch (err) { return json({ status: &#x27;error&#x27;, msg: err.message }); }
+}
+
+function json(o) {
+  return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
+}</div>
+
+
+      <div style="font-size:10px;font-weight:700;color:#888;margin:14px 0 5px;letter-spacing:.4px;">🔗 Apps Script 網頁應用程式 URL</div>
+      <div class="input-row">
+        <div class="fg"><input type="text" id="gsUrlInput" placeholder="https://script.google.com/macros/s/xxxxx/exec"></div>
+        <button class="btn btn-outline" onclick="testGs()">🔌 測試</button>
+        <button class="btn btn-primary" onclick="saveGs()">儲存</button>
+      </div>
+      <div id="gsStatus"></div>
+    </div>
+
+    <!-- CLINICS -->
+    <div class="sc">
+      <h3>🏥 院區清單</h3>
+      <p>新增或刪除前台可選擇的院區，儲存後自動同步至 Google Sheet，所有前台即時生效。</p>
+      <div class="staff-add-row" style="margin-bottom:10px;">
+        <input type="text" id="newClinicInput" placeholder="輸入院區名稱（例：新竹院區）" onkeydown="if(event.key==='Enter')addClinic()" style="flex:1;">
+        <button class="btn btn-primary" style="height:34px;padding:0 12px;font-size:11px;" onclick="addClinic()">＋</button>
+      </div>
+      <div class="chip-list" id="clinicChipList"></div>
+      <div style="margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="saveClinics()">💾 儲存並同步至 Google Sheet</button>
+        <span id="clinicSaveMsg" style="font-size:11px;color:var(--sage);"></span>
+      </div>
+    </div>
+
+    <!-- STAFF -->
+    <div class="sc">
+      <h3>👥 工作人員名單</h3>
+      <p>新增或刪除前台可選擇的各類人員，儲存後自動同步至 Google Sheet，所有院區前台即時生效。</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--brown);margin-bottom:8px;">👨‍⚕️ 醫師</div>
+          <div class="staff-add-row">
+            <input type="text" id="newDoctorInput" placeholder="輸入醫師姓名" onkeydown="if(event.key==='Enter')addPerson('doctors')">
+            <button class="btn btn-primary" style="height:34px;padding:0 12px;font-size:11px;" onclick="addPerson('doctors')">＋</button>
+          </div>
+          <div class="chip-list" id="doctorList"></div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--brown);margin-bottom:8px;">💁 櫃檯人員</div>
+          <div class="staff-add-row">
+            <input type="text" id="newStaffInput" placeholder="輸入人員姓名" onkeydown="if(event.key==='Enter')addPerson('staff')">
+            <button class="btn btn-primary" style="height:34px;padding:0 12px;font-size:11px;" onclick="addPerson('staff')">＋</button>
+          </div>
+          <div class="chip-list" id="staffList"></div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--brown);margin-bottom:8px;">👩‍⚕️ 護理師</div>
+          <div class="staff-add-row">
+            <input type="text" id="newNurseInput" placeholder="輸入護理師姓名" onkeydown="if(event.key==='Enter')addPerson('nurses')">
+            <button class="btn btn-primary" style="height:34px;padding:0 12px;font-size:11px;" onclick="addPerson('nurses')">＋</button>
+          </div>
+          <div class="chip-list" id="nurseList"></div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--brown);margin-bottom:8px;">💊 藥師</div>
+          <div class="staff-add-row">
+            <input type="text" id="newPharmaInput" placeholder="輸入藥師姓名" onkeydown="if(event.key==='Enter')addPerson('pharmas')">
+            <button class="btn btn-primary" style="height:34px;padding:0 12px;font-size:11px;" onclick="addPerson('pharmas')">＋</button>
+          </div>
+          <div class="chip-list" id="pharmaList"></div>
+        </div>
+      </div>
+      <div style="margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="saveStaff()">💾 儲存並同步至 Google Sheet</button>
+        <span id="staffSaveMsg" style="font-size:11px;color:var(--sage);"></span>
+      </div>
+    </div>
+
+    <!-- PIN -->
+    <div class="sc">
+      <h3>🔐 修改後台 PIN 碼</h3>
+      <p>修改工作人員登入後台的 PIN 碼（4位數字）。</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+        <div class="fg" style="min-width:110px;"><label>目前 PIN</label><input type="password" id="oldPin" placeholder="目前 PIN" maxlength="4"></div>
+        <div class="fg" style="min-width:110px;"><label>新 PIN 碼</label><input type="password" id="newPin" placeholder="新 PIN（4位）" maxlength="4"></div>
+        <div class="fg" style="min-width:110px;"><label>確認新 PIN</label><input type="password" id="confirmPin" placeholder="再次輸入" maxlength="4"></div>
+        <button class="btn btn-primary" onclick="changePin()">更新</button>
+      </div>
+      <div id="pinChangeMsg" style="margin-top:7px;font-size:11px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Product Modal -->
+<div class="pm-modal-overlay" id="pmModal">
+  <div class="pm-modal">
+    <h3 id="pmModalTitle">新增商品</h3>
+    <div class="pm-form-grid">
+      <div class="fg"><label>分類（標籤頁）</label>
+        <select id="pmCat">
+          <option>蛋白代餐</option><option>Q飽纖燃飲</option><option>看診套組</option>
+          <option>盒裝膠囊</option><option>其他營養</option><option value="_new">＋ 新分類...</option>
+        </select>
+      </div>
+      <div class="fg" id="pmNewCatGroup" style="display:none;"><label>新分類名稱</label><input type="text" id="pmNewCat" placeholder="例：限定商品"></div>
+    </div>
+    <div class="pm-form-grid">
+      <div class="fg"><label>商品名稱</label><input type="text" id="pmName" placeholder="例：燕麥奶"></div>
+      <div class="fg"><label>表情符號</label><input type="text" id="pmEmoji" placeholder="例：🥛" maxlength="2"></div>
+    </div>
+    <div class="pm-form-grid">
+      <div class="fg"><label>單價（NT$）</label><input type="number" id="pmPrice" placeholder="例：90" min="0"></div>
+      <div class="fg"><label>群組類型</label>
+        <select id="pmGroup">
+          <option value="protein">蛋白代餐（買6送1）</option>
+          <option value="mct">Q飽纖燃飲（買6送1）</option>
+          <option value="package">看診套組（可選數量）</option>
+          <option value="capsule">膠囊（單件）</option>
+          <option value="other">其他（單件）</option>
+        </select>
+      </div>
+    </div>
+    <div class="pm-form-grid full" id="pmDetailGroup" style="display:none;">
+      <div class="fg"><label>套組說明（選填）</label><input type="text" id="pmDetail" placeholder="例：14包蛋白代餐｜一天兩次"></div>
+    </div>
+    <div class="pm-form-grid full" id="pmBadgeGroup" style="display:none;">
+      <div class="fg"><label>標籤（選填，如：熱銷、推薦）</label><input type="text" id="pmBadge" placeholder="例：熱銷"></div>
+    </div>
+    <div class="pm-form-grid full">
+      <div class="fg"><label>分類介紹 <span style="font-size:9px;color:#888;">（顯示於前台分類頁頂端，同分類共用同一段介紹）</span></label><textarea id="pmCatDesc" rows="2" style="width:100%;resize:vertical;padding:8px;border:1px solid #dde4de;border-radius:8px;font-size:12px;font-family:inherit;" placeholder="例：每份含20克蛋白質+10克纖維，買6送1特惠"></textarea></div>
+    </div>
+    <div class="pm-modal-btns">
+      <button class="btn btn-outline" onclick="closePmModal()">取消</button>
+      <button class="btn btn-primary" onclick="savePmModal()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── KEYS ──
+const SALES_KEY='clinicSalesLog',GS_KEY='gsUrl',PIN_KEY='adminPin',STAFF_KEY='clinicStaff',PRODUCTS_KEY='clinicProducts',CLINIC_KEY='clinicClinics',PROMO_KEY='clinicPromos',COMM_KEY='clinicCommRules';
+const DEFAULT_PIN='1234';
+
+// ── DEFAULT PRODUCTS ──
+const DEFAULT_PRODUCTS=[
+  {cat:'蛋白代餐',id:'p1',emoji:'🍫',name:'巧克力',price:90,group:'protein',active:true},
+  {cat:'蛋白代餐',id:'p2',emoji:'☕',name:'觀音拿鐵',price:90,group:'protein',active:true},
+  {cat:'蛋白代餐',id:'p3',emoji:'🌿',name:'芒果百香',price:90,group:'protein',active:true},
+  {cat:'蛋白代餐',id:'p4',emoji:'🥛',name:'無添加原味',price:90,group:'protein',active:true},
+  {cat:'蛋白代餐',id:'p5',emoji:'🍎',name:'草莓蘋果',price:90,group:'protein',active:true},
+  {cat:'蛋白代餐',id:'p6',emoji:'🍵',name:'抹茶拿鐵',price:90,group:'protein',active:true},
+  {cat:'蛋白代餐',id:'p7',emoji:'🌾',name:'杏仁燕麥',price:90,group:'protein',active:true},
+  {cat:'蛋白代餐',id:'p8',emoji:'🖤',name:'黑芝麻',price:90,group:'protein',active:true},
+  {cat:'Q飽纖燃飲',id:'m1',emoji:'🍋',name:'檸果拿鐵',price:100,group:'mct',active:true},
+  {cat:'Q飽纖燃飲',id:'m2',emoji:'🫐',name:'莓果優格',price:100,group:'mct',active:true},
+  {cat:'Q飽纖燃飲',id:'m3',emoji:'🥭',name:'百香芒果',price:100,group:'mct',active:true},
+  {cat:'Q飽纖燃飲',id:'m4',emoji:'🌸',name:'荔枝玫瑰',price:100,group:'mct',active:true},
+  {cat:'看診套組',id:'pk1',emoji:'📦',name:'中碳套組',price:1000,group:'package',detail:'14包蛋白代餐｜一天兩次',badge:'熱銷',active:true},
+  {cat:'看診套組',id:'pk2',emoji:'📦',name:'低碳套組',price:1500,group:'package',detail:'21包蛋白代餐｜一天三次',badge:'推薦',active:true},
+  {cat:'盒裝膠囊',id:'c1',emoji:'💊',name:'好燃對策',price:960,group:'capsule',active:true},
+  {cat:'盒裝膠囊',id:'c2',emoji:'💊',name:'碳水對策',price:800,group:'capsule',active:true},
+  {cat:'盒裝膠囊',id:'c3',emoji:'💊',name:'甘好腸寶',price:1260,group:'capsule',active:true},
+  {cat:'盒裝膠囊',id:'c4',emoji:'💊',name:'好輕鬆',price:600,group:'capsule',active:true},
+  {cat:'盒裝膠囊',id:'c5',emoji:'💊',name:'好元氣',price:350,group:'capsule',active:true},
+  {cat:'其他營養',id:'o1',emoji:'🥚',name:'拿鐵蛋白棒',price:400,group:'other',active:true},
+  {cat:'其他營養',id:'o2',emoji:'🌿',name:'健健粉',price:420,group:'other',active:true},
+  {cat:'其他營養',id:'o3',emoji:'🔵',name:'複方蛋白粉',price:1100,group:'other',active:true},
+];
+
+
+/* ── GAS 通用 API 輔助函數 ── */
+function gasUrl(){return (typeof APP_CONFIG!=='undefined'?APP_CONFIG.GAS_URL:null)||localStorage.getItem(GS_KEY)||'';}
+async function gasRead(sheet){
+  const r=await fetch(`${gasUrl()}?sheet=${encodeURIComponent(sheet)}`);
+  return r.json();
+}
+async function gasWrite(sheet,headers,rows){
+  const r=await fetch(gasUrl(),{method:'POST',headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({sheet,headers,rows})});
+  return r.json();
+}
+
+function getProducts(){try{const s=localStorage.getItem(PRODUCTS_KEY);return s?JSON.parse(s):[...DEFAULT_PRODUCTS];}catch(e){return[...DEFAULT_PRODUCTS];}}
+function saveProducts(p, silent=false){
+  localStorage.setItem(PRODUCTS_KEY, JSON.stringify(p));
+  if(!gasUrl()) return;
+  const PRODUCT_HDR=['id','cat','name','emoji','price','group','detail','badge','active','catDescription'];
+  const rows=p.map(x=>({id:x.id||'',cat:x.cat||'',name:x.name||'',emoji:x.emoji||'',
+    price:x.price||0,group:x.group||'',detail:x.detail||'',badge:x.badge||'',
+    active:x.active===false?'FALSE':'TRUE'}));
+  gasWrite('商品主檔',PRODUCT_HDR,rows).then(d=>{
+    if(!silent) d.status==='ok'?toast('☁️ 商品已同步至 Google Sheet'):toast('⚠️ Sheet 同步失敗：'+d.msg);
+  }).catch(()=>{if(!silent)toast('⚠️ Sheet 同步網路錯誤');});
+}
+function getPin(){return localStorage.getItem(PIN_KEY)||DEFAULT_PIN;}
+
+// ── PIN ──
+let pinBuf='';
+function pinInput(d){if(pinBuf.length>=4)return;pinBuf+=d;updateDots();if(pinBuf.length===4)setTimeout(checkPin,200);}
+function pinDel(){pinBuf=pinBuf.slice(0,-1);updateDots();}
+function pinClear(){pinBuf='';updateDots();document.getElementById('pinError').textContent='';}
+function updateDots(){for(let i=0;i<4;i++)document.getElementById('d'+i).classList.toggle('filled',i<pinBuf.length);}
+function checkPin(){
+  if(pinBuf===getPin()){
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('appShell').classList.add('visible');
+    initApp();
+  }else{
+    document.getElementById('pinError').textContent='❌ PIN 碼錯誤，請重試';
+    pinBuf='';updateDots();setTimeout(()=>document.getElementById('pinError').textContent='',2000);
+  }
+}
+function logout(){document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('appShell').classList.remove('visible');pinBuf='';updateDots();}
+
+// ── INIT ──
+function initApp(){
+  renderStats();
+  loadClinicData();loadStaffData();renderStaffLists();
+  renderProductManager();
+  const gsUrl = (typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.GAS_URL : null) || localStorage.getItem(GS_KEY) || '';
+  if (gsUrl) { document.getElementById('gsUrlInput').value=gsUrl; document.getElementById('gsBadge').classList.add('show'); }
+  document.getElementById('statsDateLabel').textContent=new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'short'})+' 銷售概覽';
+}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+function switchPage(p){
+  ['stats','patient','products','promos','comm','settings'].forEach(n=>{
+    document.getElementById('page'+cap(n)).classList.toggle('active',n===p);
+    document.getElementById('nav'+cap(n)).classList.toggle('active',n===p);
+  });
+  if(p==='patient')connectAdminReader();
+  if(p==='promos')renderPromoList();
+  if(p==='comm')renderCommPage();
+}
+
+// ── STATS ──
+let activeCF='';
+function filterClinic(c,btn){activeCF=c;document.querySelectorAll('.clinic-filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderStats();}
+
+const COMM_RULES={'複方蛋白粉':{dr:100,st:20,ph:0},'蛋白代餐':{dr:100,st:10,ph:0},'Q飽纖燃飲':{dr:100,st:10,ph:0},'健健糖':{dr:50,st:10,ph:0},'蛋白棒':{dr:50,st:10,ph:0},'防蚊液':{dr:0,st:0,ph:30},'金鶯涼喉':{dr:0,st:0,ph:10},'好燃對策':{dr:0,st:0,ph:100},'碳水對策':{dr:0,st:0,ph:100},'好輕鬆':{dr:0,st:0,ph:50},'好元氣':{dr:0,st:0,ph:50},'甘好睡寶':{dr:0,st:0,ph:100},'中碳套組':{dr:100,st:10,ph:0},'低碳套組':{dr:100,st:10,ph:0},'拿鐵蛋白棒':{dr:50,st:10,ph:0},'健健粉':{dr:50,st:10,ph:0}};
+function calcComm(str){
+  let dr=0,st=0,ph=0;if(!str)return{dr,st,ph};
+  str.split('、').forEach(part=>{const m=part.match(/^(.+?)×(\d+)/);if(!m)return;const name=m[1].trim(),qty=parseInt(m[2])||1;for(const[k,r]of Object.entries(COMM_RULES)){if(name.includes(k)||k.includes(name)){dr+=r.dr*qty;st+=r.st*qty;ph+=r.ph*qty;break;}}});
+  return{dr,st,ph};
+}
+function getQty(e,key){
+  if(e.itemQty&&e.itemQty[key]!==undefined)return e.itemQty[key]||0;
+  const esc=key.replace(/[-[\]{}()*+?.,\\^$|#\s]/g,'\\$&');
+  const m=(e.items||'').match(new RegExp(esc+'×(\\d+)'));
+  return m?parseInt(m[1]):0;
+}
+
+function renderStats(){
+  const allLog=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
+  const log=activeCF?allLog.filter(e=>(e.clinic||'')===activeCF):allLog;
+  const rev=log.reduce((s,e)=>s+(e.total||0),0);
+  let tdr=0,tst=0,tph=0;
+  log.forEach(e=>{if(e.pharmaComm!==undefined){tdr+=e.doctorComm||0;tst+=e.staffComm||0;tph+=e.pharmaComm||0;}else{const c=calcComm(e.items||'');tdr+=c.dr;tst+=c.st;tph+=c.ph;}});
+  document.getElementById('statRev').textContent='NT$'+rev.toLocaleString();
+  document.getElementById('statOrders').textContent=log.length;
+  document.getElementById('statDr').textContent='NT$'+tdr.toLocaleString();
+  document.getElementById('statSt').textContent='NT$'+tst.toLocaleString();
+  document.getElementById('statPh').textContent='NT$'+tph.toLocaleString();
+
+  // Dynamic columns from current products
+  const products=getProducts().filter(p=>p.active!==false);
+  const statKeys=[];
+  products.forEach(p=>{
+    const k=p.group==='protein'?`蛋白代餐-${p.name}`:p.group==='mct'?`Q飽-${p.name}`:p.name;
+    if(!statKeys.includes(k))statKeys.push(k);
+  });
+
+  document.getElementById('statsHead').innerHTML=`<tr><th>時間</th><th>院區</th><th>顧客</th><th>醫師</th><th>人員</th>${statKeys.map(k=>`<th style="font-size:10px;white-space:nowrap;">${k.replace('蛋白代餐-','').replace('Q飽-','Q飽')}</th>`).join('')}<th>金額</th><th>付款</th><th>醫師抽</th><th>員工抽</th><th>藥師抽</th></tr>`;
+
+  function qCell(q){return q?`<td style="text-align:center;"><strong style="color:var(--sage);">${q}</strong></td>`:`<td style="text-align:center;color:#ddd;">—</td>`;}
+
+  const tbody=document.getElementById('logBody');
+  if(!log.length){tbody.innerHTML=`<tr class="empty-row"><td colspan="${10+statKeys.length}">尚無銷售紀錄</td></tr>`;return;}
+  tbody.innerHTML=[...log].reverse().map(e=>{
+    let dr,st,ph;
+    if(e.pharmaComm!==undefined){dr=e.doctorComm||0;st=e.staffComm||0;ph=e.pharmaComm||0;}else{const c=calcComm(e.items||'');dr=c.dr;st=c.st;ph=c.ph;}
+    return`<tr>
+      <td style="white-space:nowrap;">${e.time}</td>
+      <td><span style="font-size:10px;background:var(--sage-pale);color:var(--sage);padding:2px 7px;border-radius:9px;font-weight:600;white-space:nowrap;">${e.clinic||'-'}</span></td>
+      <td><strong>${e.customer}</strong>${e.phone?`<br><span style="color:#aaa;font-size:9px;">病歷號：${e.phone}</span>`:''}</td>
+      <td style="white-space:nowrap;">${e.doctor}</td>
+      <td style="white-space:nowrap;">${e.staff||'-'}</td>
+      ${statKeys.map(k=>qCell(getQty(e,k))).join('')}
+      <td style="white-space:nowrap;"><strong style="color:var(--sage);">NT$${(e.total||0).toLocaleString()}</strong></td>
+      <td><span class="tag ${e.payMethod==='cash'?'tag-cash':'tag-transfer'}">${e.payMethod==='cash'?'現金':'轉帳'}</span></td>
+      <td style="color:var(--brown);white-space:nowrap;">${dr?'NT$'+dr.toLocaleString():'-'}</td>
+      <td style="color:var(--brown);white-space:nowrap;">${st?'NT$'+st.toLocaleString():'-'}</td>
+      <td style="color:var(--purple);white-space:nowrap;">${ph?'NT$'+ph.toLocaleString():'-'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function clearLog(){if(!confirm('確定要清除所有銷售紀錄嗎？'))return;localStorage.setItem(SALES_KEY,'[]');renderStats();toast('🗑️ 紀錄已清除');}
+
+// ── PATIENT LOOKUP ──
+async function hashId(id){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(id.toUpperCase()));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,16);}
+function maskId(id){if(!id||id.length<4)return id;return id.slice(0,3)+'****'+id.slice(-3);}
+
+async function adminLookup(){
+  const raw=document.getElementById('adminIdInput').value.trim().toUpperCase();
+  if(raw.length<6){toast('⚠️ 請輸入至少6位');return;}
+  const hash=await hashId(raw);
+  const statusEl=document.getElementById('adminLookupStatus');
+  statusEl.innerHTML='<span style="color:#888;">🔄 查詢中...</span>';
+  const gsUrl=localStorage.getItem(GS_KEY)||'';
+  let records=[],source='local';
+  if(gsUrl){try{const res=await fetch(`${gsUrl}?action=query&idHash=${encodeURIComponent(hash)}`);const d=await res.json();if(d.status==='ok'&&Array.isArray(d.records)){records=d.records;source='sheets';}}catch(e){}}
+  if(source==='local'){const log=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');records=log.filter(e=>e.idHash===hash);}
+  if(!records.length){statusEl.innerHTML=`<span style="color:var(--red);">❌ 查無 ${maskId(raw)} 的購買紀錄</span>`;document.getElementById('adminPatientResult').style.display='none';return;}
+  statusEl.innerHTML=`<span style="color:var(--sage);">找到 <strong>${records.length}</strong> 筆｜${maskId(raw)}｜${source==='sheets'?'✅ Google Sheets':'⚠️ 僅本機'}</span>`;
+  document.getElementById('adminPatientResult').style.display='';
+  const totalSpent=records.reduce((s,e)=>s+(Number(e.total)||0),0);
+  const firstName=records[records.length-1].customer||'';
+  const clinics={};records.forEach(r=>{const c=r.clinic||'未知';clinics[c]=(clinics[c]||0)+1;});
+  const clinicSum=Object.entries(clinics).map(([c,n])=>`${c}×${n}`).join('、');
+  document.getElementById('adminPatientHeader').innerHTML=`
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="width:44px;height:44px;border-radius:50%;background:var(--sage);color:#fff;font-size:18px;font-weight:900;display:flex;align-items:center;justify-content:center;">${firstName?firstName.charAt(0):'👤'}</div>
+      <div>
+        <div style="font-size:15px;font-weight:700;">${firstName} <span style="font-size:11px;color:#888;font-weight:400;">${maskId(raw)}</span></div>
+        <div style="font-size:10px;color:#888;margin-top:2px;">院區：${clinicSum}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:20px;flex-shrink:0;">
+      <div style="text-align:center;"><div style="font-size:22px;font-weight:900;color:var(--sage);">${records.length}</div><div style="font-size:10px;color:#888;">次數</div></div>
+      <div style="text-align:center;"><div style="font-size:22px;font-weight:900;color:var(--sage);">NT$${totalSpent.toLocaleString()}</div><div style="font-size:10px;color:#888;">累計消費</div></div>
+    </div>`;
+  function parseItems(str){const m={};if(!str)return m;str.split('、').forEach(p=>{const x=p.match(/^(.+?)×(\d+)/);if(x)m[x[1].trim()]=parseInt(x[2])||1;});return m;}
+  const seenP=[];records.forEach(r=>{Object.keys(parseItems(r.items||'')).forEach(k=>{if(!seenP.includes(k))seenP.push(k);});});
+  document.getElementById('patientThead').innerHTML=`<tr><th>日期</th><th>院區</th><th>醫師</th>${seenP.map(p=>`<th style="font-size:10px;white-space:nowrap;">${p}</th>`).join('')}<th>金額</th><th>付款</th></tr>`;
+  document.getElementById('adminPatientBody').innerHTML=[...records].reverse().map(e=>{
+    const m=parseItems(e.items||'');
+    return`<tr>
+      <td style="white-space:nowrap;">${e.date||''}</td>
+      <td><span style="font-size:10px;background:var(--sage-pale);color:var(--sage);padding:2px 7px;border-radius:9px;font-weight:600;">${e.clinic||'-'}</span></td>
+      <td style="white-space:nowrap;">${e.doctor||''}</td>
+      ${seenP.map(p=>m[p]?`<td style="text-align:center;"><strong style="color:var(--sage);">${m[p]}</strong></td>`:`<td style="text-align:center;color:#ddd;">—</td>`).join('')}
+      <td style="white-space:nowrap;"><strong style="color:var(--sage);">NT$${(Number(e.total)||0).toLocaleString()}</strong></td>
+      <td><span class="tag ${e.payMethod==='cash'?'tag-cash':'tag-transfer'}">${e.payMethod==='cash'?'現金':'轉帳'}</span></td>
+    </tr>`;
+  }).join('');
+}
+function adminClearLookup(){document.getElementById('adminIdInput').value='';document.getElementById('adminLookupStatus').innerHTML='';document.getElementById('adminPatientResult').style.display='none';}
+
+// ── READER ──
+const WS_URL='ws://localhost:8765';
+let adminWs=null,adminWsRetry=3000;
+function setReaderState(s,t){const p=document.getElementById('adminReaderPill');const tx=document.getElementById('adminReaderText');const b=document.getElementById('adminReadBtn');if(!p)return;p.className='reader-pill '+s;tx.textContent=t;if(b)b.disabled=s!=='ready';}
+function connectAdminReader(){
+  if(adminWs&&adminWs.readyState===WebSocket.OPEN)return;
+  setReaderState('connecting','連線中...');
+  try{
+    adminWs=new WebSocket(WS_URL);
+    adminWs.onopen=()=>{adminWsRetry=3000;};
+    adminWs.onmessage=e=>{try{handleCardMsg(JSON.parse(e.data));}catch(err){}};
+    adminWs.onclose=()=>{setReaderState('off','讀卡機未連線');setTimeout(()=>{adminWsRetry=Math.min(adminWsRetry*1.5,30000);connectAdminReader();},adminWsRetry);};
+    adminWs.onerror=()=>setReaderState('error','連線失敗');
+  }catch(e){setReaderState('error','連線失敗');}
+}
+function handleCardMsg(msg){
+  if(msg.type==='status'){if(msg.ready)setReaderState('ready',`讀卡機就緒${msg.mode==='mock'?' (模擬)':''}`);}
+  else if(msg.type==='reading')setReaderState('reading','請插入健保卡...');
+  else if(msg.type==='card_data'){setReaderState('ready','讀卡機就緒');if(msg.success){document.getElementById('adminIdInput').value=msg.id||'';toast(`💳 讀卡成功：${msg.name||msg.id}`);adminLookup();}else toast('❌ 讀卡失敗：'+(msg.error||'未知'));}
+}
+function adminTriggerCard(){if(!adminWs||adminWs.readyState!==WebSocket.OPEN){toast('⚠️ 讀卡機未連線');return;}adminWs.send(JSON.stringify({cmd:'read_card',timeout:20}));}
+
+// ── PRODUCT MANAGER ──
+function renderProductManager(){
+  const products=getProducts();
+  document.getElementById('pmCount').textContent=products.length;
+  const cats=[],groups={};
+  products.forEach(p=>{if(!groups[p.cat]){cats.push(p.cat);groups[p.cat]=[];}groups[p.cat].push(p);});
+  const CAT_EMOJI={'蛋白代餐':'🥛','Q飽纖燃飲':'💧','看診套組':'🎁','盒裝膠囊':'💊','其他營養':'🌿'};
+  const GROUP_LABEL={'protein':'蛋白代餐（買6送1）','mct':'Q飽（買6送1）','package':'套組','capsule':'膠囊','other':'其他'};
+
+  document.getElementById('pmList').innerHTML=cats.map(cat=>`
+    <div class="pm-grid" style="margin-bottom:12px;" data-cat="${cat}">
+      <div class="pm-cat-header">
+        <span>${CAT_EMOJI[cat]||'🛍️'} ${cat}</span>
+        <span style="font-size:10px;color:var(--sage);">${groups[cat].length} 項 <span style="color:#bbb;font-weight:400;">｜ 拖曳 ☰ 排序</span></span>
+      </div>
+      <div class="pm-cat-body" data-cat="${cat}">
+        ${groups[cat].map(p=>`
+          <div class="pm-item${p.active===false?' inactive':''}" draggable="true" data-id="${p.id}" data-cat="${p.cat}">
+            <span class="pm-drag" title="拖曳排序">☰</span>
+            <span class="pm-emoji">${p.emoji||'📦'}</span>
+            <div class="pm-info">
+              <span class="pm-name">${p.name}</span>
+              <span style="font-size:9px;color:#aaa;margin-left:5px;">${GROUP_LABEL[p.group]||p.group}</span>
+            </div>
+            <span class="pm-price">NT$${p.price.toLocaleString()}</span>
+            <button class="pm-edit-btn" onclick="openProductModal('${p.id}')">編輯</button>
+            <button class="pm-toggle${p.active!==false?' on':''}" onclick="toggleProduct('${p.id}')" title="${p.active!==false?'點擊下架':'點擊上架'}"></button>
+            <button class="pm-del-btn" onclick="deleteProduct('${p.id}')" title="刪除">×</button>
+          </div>`).join('')}
+        <div class="pm-add-row" data-add-row>
+          <button class="btn btn-sm primary" onclick="openProductModal(null,'${cat}')">＋ 在「${cat}」新增</button>
+        </div>
+      </div>
+    </div>`).join('');
+
+  initDragSort();
+}
+
+// ── DRAG & DROP SORT ──
+let dragSrc=null;
+
+function initDragSort(){
+  document.querySelectorAll('.pm-item').forEach(el=>{
+    el.addEventListener('dragstart',e=>{
+      dragSrc=el;
+      el.style.opacity='.4';
+      e.dataTransfer.effectAllowed='move';
+      e.dataTransfer.setData('text/plain', el.dataset.id);
+    });
+    el.addEventListener('dragend',e=>{
+      el.style.opacity='';
+      document.querySelectorAll('.pm-item').forEach(x=>x.classList.remove('drag-over'));
+      document.querySelectorAll('.pm-cat-body').forEach(x=>x.classList.remove('drag-over-body'));
+    });
+    el.addEventListener('dragover',e=>{
+      e.preventDefault();e.dataTransfer.dropEffect='move';
+      if(dragSrc&&dragSrc!==el){
+        document.querySelectorAll('.pm-item').forEach(x=>x.classList.remove('drag-over'));
+        el.classList.add('drag-over');
+      }
+    });
+    el.addEventListener('dragleave',e=>{el.classList.remove('drag-over');});
+    el.addEventListener('drop',e=>{
+      e.preventDefault();
+      if(!dragSrc||dragSrc===el)return;
+      const srcId=dragSrc.dataset.id;
+      const tgtId=el.dataset.id;
+      const tgtCat=el.dataset.cat;
+      const products=getProducts();
+      const srcIdx=products.findIndex(p=>p.id===srcId);
+      const tgtIdx=products.findIndex(p=>p.id===tgtId);
+      if(srcIdx<0||tgtIdx<0)return;
+      // Update category if dropped into different cat
+      products[srcIdx].cat=tgtCat;
+      // Move in array
+      const [item]=products.splice(srcIdx,1);
+      const newTgt=products.findIndex(p=>p.id===tgtId);
+      products.splice(newTgt,0,item);
+      saveProducts(products);
+      renderProductManager();
+      toast('✅ 順序已更新');
+    });
+  });
+
+  // Also allow drop on empty category body
+  document.querySelectorAll('.pm-cat-body').forEach(body=>{
+    body.addEventListener('dragover',e=>{e.preventDefault();body.classList.add('drag-over-body');});
+    body.addEventListener('dragleave',e=>{if(!body.contains(e.relatedTarget))body.classList.remove('drag-over-body');});
+    body.addEventListener('drop',e=>{
+      e.preventDefault();body.classList.remove('drag-over-body');
+      if(!dragSrc)return;
+      const targetEl=e.target.closest('.pm-item');
+      if(targetEl)return; // handled by item drop
+      const tgtCat=body.dataset.cat;
+      const srcId=dragSrc.dataset.id;
+      const products=getProducts();
+      const srcIdx=products.findIndex(p=>p.id===srcId);
+      if(srcIdx<0)return;
+      // Move to end of that category
+      products[srcIdx].cat=tgtCat;
+      const [item]=products.splice(srcIdx,1);
+      // Find last index of tgtCat
+      let lastIdx=products.reduce((acc,p,i)=>p.cat===tgtCat?i:acc,-1);
+      products.splice(lastIdx+1,0,item);
+      saveProducts(products);
+      renderProductManager();
+      toast('✅ 已移至「'+tgtCat+'」');
+    });
+  });
+}
+
+function toggleProduct(id){
+  const p=getProducts();const idx=p.findIndex(x=>x.id===id);
+  if(idx<0)return;p[idx].active=p[idx].active===false?true:false;
+  saveProducts(p);renderProductManager();
+  toast(p[idx].active?`✅ 已上架：${p[idx].name}`:`⏸ 已下架：${p[idx].name}`);
+}
+
+function deleteProduct(id){
+  const p=getProducts();const item=p.find(x=>x.id===id);
+  if(!item||!confirm(`確定刪除「${item.name}」？\n此動作無法復原。`))return;
+  saveProducts(p.filter(x=>x.id!==id));renderProductManager();toast('🗑️ 已刪除：'+item.name);
+}
+
+function resetProducts(){
+  if(!confirm('確定重置為系統預設商品清單？\n所有自訂商品將被覆蓋。'))return;
+  saveProducts([...DEFAULT_PRODUCTS]);renderProductManager();toast('↺ 已重置為預設商品');
+}
+
+// ── PRODUCT MODAL ──
+let editingProductId=null;
+function openProductModal(id=null,defaultCat=''){
+  editingProductId=id;
+  const modal=document.getElementById('pmModal');
+  modal.classList.add('open');
+  const products=getProducts();
+  const cats=[...new Set(products.map(p=>p.cat))];
+  const catSel=document.getElementById('pmCat');
+  catSel.innerHTML=cats.map(c=>`<option${c===defaultCat?' selected':''}>${c}</option>`).join('')+'<option value="_new">＋ 新分類...</option>';
+  if(id){
+    const p=products.find(x=>x.id===id);
+    if(!p)return;
+    document.getElementById('pmModalTitle').textContent='編輯商品';
+    catSel.value=p.cat;
+    document.getElementById('pmName').value=p.name;
+    document.getElementById('pmEmoji').value=p.emoji||'';
+    document.getElementById('pmPrice').value=p.price;
+    document.getElementById('pmGroup').value=p.group;
+    document.getElementById('pmDetail').value=p.detail||'';
+    document.getElementById('pmBadge').value=p.badge||'';
+    document.getElementById('pmCatDesc').value=p.catDescription||'';
+  }else{
+    document.getElementById('pmModalTitle').textContent='新增商品';
+    ['pmName','pmEmoji','pmDetail','pmBadge','pmCatDesc'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('pmPrice').value='';
+    document.getElementById('pmGroup').value='other';
+  }
+  updatePmFields();
+}
+function closePmModal(){document.getElementById('pmModal').classList.remove('open');editingProductId=null;}
+function updatePmFields(){
+  const grp=document.getElementById('pmGroup').value;
+  const isPkg=grp==='package';
+  document.getElementById('pmDetailGroup').style.display=isPkg?'block':'none';
+  document.getElementById('pmBadgeGroup').style.display=isPkg?'block':'none';
+  const catVal=document.getElementById('pmCat').value;
+  document.getElementById('pmNewCatGroup').style.display=catVal==='_new'?'block':'none';
+}
+document.getElementById('pmGroup').addEventListener('change',updatePmFields);
+document.getElementById('pmCat').addEventListener('change',updatePmFields);
+
+function savePmModal(){
+  const catVal=document.getElementById('pmCat').value;
+  const newCat=document.getElementById('pmNewCat').value.trim();
+  const cat=catVal==='_new'?newCat:catVal;
+  if(!cat){toast('⚠️ 請選擇或輸入分類');return;}
+  const name=document.getElementById('pmName').value.trim();
+  if(!name){toast('⚠️ 請輸入商品名稱');return;}
+  const price=parseInt(document.getElementById('pmPrice').value)||0;
+  const emoji=document.getElementById('pmEmoji').value.trim()||'📦';
+  const group=document.getElementById('pmGroup').value;
+  const detail=document.getElementById('pmDetail').value.trim();
+  const badge=document.getElementById('pmBadge').value.trim();
+  const catDescription=document.getElementById('pmCatDesc').value.trim();
+
+  const products=getProducts();
+  if(editingProductId){
+    const idx=products.findIndex(p=>p.id===editingProductId);
+    if(idx>=0){products[idx]={...products[idx],cat,name,emoji,price,group,detail:detail||undefined,badge:badge||undefined,catDescription:catDescription||undefined};}
+  }else{
+    const newId='custom_'+Date.now();
+    const newP={cat,id:newId,emoji,name,price,group,active:true};
+    if(detail)newP.detail=detail;if(badge)newP.badge=badge;if(catDescription)newP.catDescription=catDescription;
+    products.push(newP);
+  }
+  saveProducts(products);renderProductManager();closePmModal();
+  toast(editingProductId?`✅ 已更新：${name}`:`✅ 已新增：${name}`);
+}
+
+// ── STAFF ──
+
+/* ══════════════════════════════════════════
+   促銷活動管理
+   ══════════════════════════════════════════ */
+const PROMO_HEADERS=['id','name','type','scope','buyQty','freeQty','discountValue','active','startDate','endDate'];
+const PROMO_TYPE_LABEL={buyNgetN:'🎁 買N送N',fixedDiscount:'💰 固定折扣',percentDiscount:'📉 百分比折',bundle:'📦 套組定價'};
+
+let editPromos=[];
+
+function loadPromoData(){
+  try{const s=localStorage.getItem(PROMO_KEY);editPromos=s?JSON.parse(s):[];}catch(e){editPromos=[];}
+}
+
+function getDefaultPromos(){
+  return [
+    {id:'promo_protein_b6g1',name:'蛋白代餐買6送1',type:'buyNgetN',scope:'group:protein',buyQty:6,freeQty:1,discountValue:0,active:'TRUE',startDate:'',endDate:''},
+    {id:'promo_mct_b6g1',   name:'Q飽纖燃飲買6送1',type:'buyNgetN',scope:'group:mct',   buyQty:6,freeQty:1,discountValue:0,active:'TRUE',startDate:'',endDate:''},
+  ];
+}
+
+function renderPromoList(){
+  loadPromoData();
+  const el=document.getElementById('promoList');
+  if(!el)return;
+  if(!editPromos.length){
+    el.innerHTML=`<div style="text-align:center;padding:30px;color:#aaa;">
+      <div style="font-size:32px;margin-bottom:8px;">🏷️</div>
+      <p>尚無促銷活動</p>
+      <button class="btn btn-outline" style="margin-top:10px;" onclick="initDefaultPromos()">載入預設活動（買6送1）</button>
+    </div>`;
+    return;
+  }
+  el.innerHTML=editPromos.map((p,i)=>`
+    <div class="pm-item" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;background:${p.active==='TRUE'||p.active===true?'#fff':'#f5f5f5'};border:1px solid #e0e8e2;margin-bottom:8px;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;font-size:13px;${p.active==='TRUE'||p.active===true?'':'color:#aaa;text-decoration:line-through;'}">${p.name}</div>
+        <div style="font-size:11px;color:#888;margin-top:2px;">
+          ${PROMO_TYPE_LABEL[p.type]||p.type} ／ 範圍：${p.scope||'all'}
+          ${p.type==='buyNgetN'?` ／ 買${p.buyQty}送${p.freeQty}`:''}
+          ${(p.type==='fixedDiscount'||p.type==='percentDiscount')?` ／ 折扣值：${p.discountValue}${p.type==='percentDiscount'?'%':'元'}`:''}
+          ${p.type==='bundle'?` ／ 套組價：NT$${p.discountValue}`:''}
+          ${p.startDate||p.endDate?` ／ 期間：${p.startDate||'--'}～${p.endDate||'--'}`:''}
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0;">
+        <button class="btn btn-outline" style="padding:4px 10px;font-size:11px;" onclick="togglePromo(${i})">${p.active==='TRUE'||p.active===true?'下架':'上架'}</button>
+        <button class="btn btn-outline" style="padding:4px 10px;font-size:11px;" onclick="openPromoModal(${i})">編輯</button>
+        <button class="btn" style="padding:4px 10px;font-size:11px;background:#fce4ec;color:#c62828;border:none;" onclick="deletePromo(${i})">刪除</button>
+      </div>
+    </div>`).join('');
+}
+
+function initDefaultPromos(){
+  editPromos=getDefaultPromos();
+  savePromos();
+  renderPromoList();
+}
+
+function togglePromo(i){
+  const p=editPromos[i];
+  p.active=(p.active==='TRUE'||p.active===true)?'FALSE':'TRUE';
+  savePromos();renderPromoList();
+}
+
+function deletePromo(i){
+  if(!confirm('確定刪除「'+editPromos[i].name+'」？'))return;
+  editPromos.splice(i,1);savePromos();renderPromoList();
+}
+
+function savePromos(){
+  localStorage.setItem(PROMO_KEY,JSON.stringify(editPromos));
+  if(!gasUrl())return;
+  const rows=editPromos.map(p=>({
+    id:p.id||'',name:p.name||'',type:p.type||'',scope:p.scope||'all',
+    buyQty:p.buyQty||0,freeQty:p.freeQty||0,discountValue:p.discountValue||0,
+    active:(p.active==='TRUE'||p.active===true)?'TRUE':'FALSE',
+    startDate:p.startDate||'',endDate:p.endDate||''
+  }));
+  gasWrite('促銷活動',PROMO_HEADERS,rows)
+    .then(d=>d.status==='ok'?toast('☁️ 促銷活動已同步至 Google Sheet'):toast('⚠️ 同步失敗：'+d.msg))
+    .catch(()=>toast('⚠️ Sheet 同步網路錯誤'));
+}
+
+// ── Promo Modal ──
+let editingPromoIdx=-1;
+function openPromoModal(idx){
+  editingPromoIdx=idx===undefined?-1:idx;
+  const p=editingPromoIdx>=0?editPromos[editingPromoIdx]:{};
+  const types=['buyNgetN','fixedDiscount','percentDiscount','bundle'];
+  document.getElementById('promoModalOverlay').classList.add('open');
+  document.getElementById('promoModalBody').innerHTML=`
+    <h3 style="margin:0 0 16px;">${editingPromoIdx>=0?'編輯':'新增'}促銷活動</h3>
+    <div style="display:grid;gap:10px;">
+      <div class="form-group">
+        <label style="font-size:11px;font-weight:700;">活動名稱</label>
+        <input class="fg-input" id="pm_name" value="${p.name||''}" placeholder="例：蛋白代餐買6送1">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group">
+          <label style="font-size:11px;font-weight:700;">活動類型</label>
+          <select class="fg-input" id="pm_type" onchange="promoTypeChanged()">
+            ${types.map(t=>`<option value="${t}"${p.type===t?' selected':''}>${PROMO_TYPE_LABEL[t]||t}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label style="font-size:11px;font-weight:700;">適用範圍</label>
+          <input class="fg-input" id="pm_scope" value="${p.scope||'all'}" placeholder="all / group:protein / id:p1">
+        </div>
+      </div>
+      <div id="pm_extra" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group">
+          <label style="font-size:11px;font-weight:700;">開始日期（留空=永久）</label>
+          <input class="fg-input" type="date" id="pm_startDate" value="${p.startDate||''}">
+        </div>
+        <div class="form-group">
+          <label style="font-size:11px;font-weight:700;">結束日期（留空=永久）</label>
+          <input class="fg-input" type="date" id="pm_endDate" value="${p.endDate||''}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label style="font-size:11px;font-weight:700;">狀態</label>
+        <select class="fg-input" id="pm_active">
+          <option value="TRUE"${(p.active==='TRUE'||p.active===true||!p.active)?' selected':''}>✅ 啟用</option>
+          <option value="FALSE"${(p.active==='FALSE'||p.active===false)?' selected':''}>⏸️ 停用</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:18px;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closePromoModal()">取消</button>
+      <button class="btn btn-primary" onclick="savePromoModal()">儲存</button>
+    </div>`;
+  promoTypeChanged();
+}
+
+function promoTypeChanged(){
+  const type=document.getElementById('pm_type')?.value;
+  const extra=document.getElementById('pm_extra');
+  if(!extra)return;
+  const p=editingPromoIdx>=0?editPromos[editingPromoIdx]:{};
+  if(type==='buyNgetN'){
+    extra.innerHTML=`
+      <div class="form-group"><label style="font-size:11px;font-weight:700;">買幾個（N）</label><input class="fg-input" type="number" id="pm_buyQty" value="${p.buyQty||6}" min="1"></div>
+      <div class="form-group"><label style="font-size:11px;font-weight:700;">送幾個（N）</label><input class="fg-input" type="number" id="pm_freeQty" value="${p.freeQty||1}" min="1"></div>`;
+  } else if(type==='fixedDiscount'){
+    extra.innerHTML=`<div class="form-group" style="grid-column:1/-1;"><label style="font-size:11px;font-weight:700;">折扣金額（元）</label><input class="fg-input" type="number" id="pm_discountValue" value="${p.discountValue||0}" min="0"></div>`;
+  } else if(type==='percentDiscount'){
+    extra.innerHTML=`<div class="form-group" style="grid-column:1/-1;"><label style="font-size:11px;font-weight:700;">折後百分比（例：九折填90，八五折填85）</label><input class="fg-input" type="number" id="pm_discountValue" value="${p.discountValue||90}" min="1" max="99"></div>`;
+  } else if(type==='bundle'){
+    extra.innerHTML=`<div class="form-group" style="grid-column:1/-1;"><label style="font-size:11px;font-weight:700;">套組固定售價（元）</label><input class="fg-input" type="number" id="pm_discountValue" value="${p.discountValue||0}" min="0"></div>`;
+  } else { extra.innerHTML=''; }
+}
+
+function savePromoModal(){
+  const name=document.getElementById('pm_name').value.trim();
+  if(!name){toast('⚠️ 請填寫活動名稱');return;}
+  const type=document.getElementById('pm_type').value;
+  const buyQty=parseInt(document.getElementById('pm_buyQty')?.value)||0;
+  const freeQty=parseInt(document.getElementById('pm_freeQty')?.value)||0;
+  const discountValue=parseFloat(document.getElementById('pm_discountValue')?.value)||0;
+  const promo={
+    id: editingPromoIdx>=0 ? editPromos[editingPromoIdx].id : 'promo_'+Date.now(),
+    name, type,
+    scope: document.getElementById('pm_scope').value.trim()||'all',
+    buyQty, freeQty, discountValue,
+    active: document.getElementById('pm_active').value,
+    startDate: document.getElementById('pm_startDate').value,
+    endDate:   document.getElementById('pm_endDate').value,
+  };
+  if(editingPromoIdx>=0) editPromos[editingPromoIdx]=promo;
+  else editPromos.push(promo);
+  savePromos();renderPromoList();closePromoModal();
+  toast('✅ 促銷活動已儲存');
+}
+
+function closePromoModal(){document.getElementById('promoModalOverlay').classList.remove('open');}
+
+
+/* ══════════════════════════════════════════
+   分潤設定管理
+   ══════════════════════════════════════════ */
+const COMM_HEADERS=['productId','productName','doctorType','doctorValue','staffType','staffValue','nurseType','nurseValue','pharmaType','pharmaValue'];
+const COMM_ROLES=[
+  {key:'doctor',label:'👨‍⚕️ 醫師'},
+  {key:'staff', label:'💁 員工'},
+  {key:'nurse', label:'👩‍⚕️ 護理'},
+  {key:'pharma',label:'💊 藥師'},
+];
+
+let editCommRules=[];
+
+function loadCommData(){
+  try{const s=localStorage.getItem(COMM_KEY);editCommRules=s?JSON.parse(s):[];}catch(e){editCommRules=[];}
+}
+
+function initDefaultComm(){
+  if(!confirm('載入預設分潤規則？現有設定將被覆蓋。'))return;
+  editCommRules=[
+    {productId:'_cat_蛋白代餐',productName:'蛋白代餐（分類預設）',doctorType:'fixed',doctorValue:100,staffType:'fixed',staffValue:10,nurseType:'fixed',nurseValue:0,pharmaType:'fixed',pharmaValue:0},
+    {productId:'_cat_Q飽纖燃飲',productName:'Q飽纖燃飲（分類預設）',doctorType:'fixed',doctorValue:100,staffType:'fixed',staffValue:10,nurseType:'fixed',nurseValue:0,pharmaType:'fixed',pharmaValue:0},
+    {productId:'_cat_看診套組',productName:'看診套組（分類預設）',doctorType:'fixed',doctorValue:100,staffType:'fixed',staffValue:10,nurseType:'fixed',nurseValue:0,pharmaType:'fixed',pharmaValue:0},
+    {productId:'_cat_盒裝膠囊',productName:'盒裝膠囊（分類預設）',doctorType:'fixed',doctorValue:0,staffType:'fixed',staffValue:0,nurseType:'fixed',nurseValue:0,pharmaType:'percent',pharmaValue:10},
+    {productId:'_cat_其他營養',productName:'其他營養（分類預設）',doctorType:'fixed',doctorValue:50,staffType:'fixed',staffValue:10,nurseType:'fixed',nurseValue:0,pharmaType:'fixed',pharmaValue:0},
+  ];
+  saveCommRules();renderCommPage();toast('✅ 預設分潤規則已載入');
+}
+
+function renderCommPage(){
+  loadCommData();
+  const el=document.getElementById('commList');
+  if(!el)return;
+  if(!editCommRules.length){
+    el.innerHTML=`<div style="text-align:center;padding:30px;color:#aaa;"><div style="font-size:32px;margin-bottom:8px;">💰</div><p>尚無分潤規則</p><button class="btn btn-outline" style="margin-top:10px;" onclick="initDefaultComm()">載入預設規則</button></div>`;
+    return;
+  }
+  el.innerHTML=`
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="background:#2C3E35;color:#fff;">
+          <th style="padding:8px 10px;text-align:left;white-space:nowrap;">商品/分類</th>
+          <th style="padding:8px 10px;text-align:center;">👨‍⚕️ 醫師</th>
+          <th style="padding:8px 10px;text-align:center;">💁 員工</th>
+          <th style="padding:8px 10px;text-align:center;">👩‍⚕️ 護理</th>
+          <th style="padding:8px 10px;text-align:center;">💊 藥師</th>
+          <th style="padding:8px 10px;text-align:center;">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${editCommRules.map((r,i)=>`
+          <tr style="border-bottom:1px solid #eee;background:${i%2===0?'#fff':'#fafafa'}">
+            <td style="padding:8px 10px;">
+              <div style="font-weight:600;">${r.productName||r.productId||'-'}</div>
+              <div style="font-size:10px;color:#888;">${r.productId||''}</div>
+            </td>
+            ${['doctor','staff','nurse','pharma'].map(role=>`
+              <td style="padding:8px 10px;text-align:center;white-space:nowrap;">
+                ${r[role+'Type']==='percent'
+                  ? `<span style="color:#2E7D32;font-weight:600;">${r[role+'Value']}%</span>`
+                  : `<span style="font-weight:600;">NT$${r[role+'Value']||0}</span>`}
+                <div style="font-size:9px;color:#aaa;">${r[role+'Type']==='percent'?'百分比':'固定'}</div>
+              </td>`).join('')}
+            <td style="padding:8px 10px;text-align:center;">
+              <div style="display:flex;gap:4px;justify-content:center;">
+                <button class="btn btn-outline" style="padding:3px 8px;font-size:10px;" onclick="openCommModal(${i})">編輯</button>
+                <button class="btn" style="padding:3px 8px;font-size:10px;background:#fce4ec;color:#c62828;border:none;" onclick="deleteCommRule(${i})">刪除</button>
+              </div>
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    </div>`;
+}
+
+function deleteCommRule(i){
+  if(!confirm('確定刪除此分潤規則？'))return;
+  editCommRules.splice(i,1);saveCommRules();renderCommPage();
+}
+
+function saveCommRules(){
+  localStorage.setItem(COMM_KEY,JSON.stringify(editCommRules));
+  if(!gasUrl())return;
+  const rows=editCommRules.map(r=>({
+    productId:r.productId||'',productName:r.productName||'',
+    doctorType:r.doctorType||'fixed',doctorValue:r.doctorValue||0,
+    staffType:r.staffType||'fixed',staffValue:r.staffValue||0,
+    nurseType:r.nurseType||'fixed',nurseValue:r.nurseValue||0,
+    pharmaType:r.pharmaType||'fixed',pharmaValue:r.pharmaValue||0,
+  }));
+  gasWrite('分潤規則',COMM_HEADERS,rows)
+    .then(d=>d.status==='ok'?toast('☁️ 分潤規則已同步至 Google Sheet'):toast('⚠️ 同步失敗：'+d.msg))
+    .catch(()=>toast('⚠️ Sheet 同步網路錯誤'));
+}
+
+// ── Comm Modal ──
+let editingCommIdx=-1;
+function openCommModal(idx){
+  editingCommIdx=idx===undefined?-1:idx;
+  const r=editingCommIdx>=0?editCommRules[editingCommIdx]:{};
+  const products=getProducts();
+
+  // Build product id options
+  const cats=[...new Set(products.map(p=>p.cat))];
+  const groups=[...new Set(products.map(p=>p.group))];
+  const productOpts=`
+    <option value="">── 指定商品 ──</option>
+    ${products.map(p=>`<option value="${p.id}"${r.productId===p.id?' selected':''}>${p.name}（${p.cat}）</option>`).join('')}
+    <option value="">── 分類預設 ──</option>
+    ${cats.map(cat=>`<option value="_cat_${cat}"${r.productId==='_cat_'+cat?' selected':''}>_cat_${cat}</option>`).join('')}
+    <option value="">── 群組預設 ──</option>
+    ${groups.map(g=>`<option value="_group_${g}"${r.productId==='_group_'+g?' selected':''}>_group_${g}</option>`).join('')}
+    <option value="_custom_">自訂輸入</option>`;
+
+  document.getElementById('commModalOverlay').classList.add('open');
+  document.getElementById('commModalBody').innerHTML=`
+    <h3 style="margin:0 0 16px;">${editingCommIdx>=0?'編輯':'新增'}分潤規則</h3>
+    <div style="display:grid;gap:12px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group">
+          <label style="font-size:11px;font-weight:700;">套用對象</label>
+          <select class="fg-input" id="cm_pid" onchange="commPidChanged()">
+            ${productOpts}
+          </select>
+        </div>
+        <div class="form-group" id="cm_pid_custom_group" style="display:${r.productId&&!products.find(p=>p.id===r.productId)&&!r.productId.startsWith('_cat_')&&!r.productId.startsWith('_group_')?'block':'none'}">
+          <label style="font-size:11px;font-weight:700;">自訂 productId</label>
+          <input class="fg-input" id="cm_pid_custom" value="${r.productId||''}" placeholder="如：_cat_蛋白代餐">
+        </div>
+      </div>
+      <div class="form-group">
+        <label style="font-size:11px;font-weight:700;">顯示名稱</label>
+        <input class="fg-input" id="cm_name" value="${r.productName||''}" placeholder="例：蛋白代餐（分類預設）">
+      </div>
+      <div style="border:1px solid #eee;border-radius:10px;padding:12px;">
+        <div style="font-size:11px;font-weight:700;margin-bottom:10px;color:#555;">各角色分潤設定</div>
+        <div style="display:grid;gap:8px;">
+          ${COMM_ROLES.map(role=>`
+            <div style="display:grid;grid-template-columns:80px 1fr 1fr;align-items:center;gap:8px;">
+              <div style="font-size:12px;font-weight:600;">${role.label}</div>
+              <select class="fg-input" id="cm_${role.key}_type" style="height:32px;font-size:12px;">
+                <option value="fixed"${(r[role.key+'Type']||'fixed')==='fixed'?' selected':''}>固定金額 NT$</option>
+                <option value="percent"${r[role.key+'Type']==='percent'?' selected':''}>百分比 %</option>
+              </select>
+              <input class="fg-input" type="number" id="cm_${role.key}_val" value="${r[role.key+'Value']||0}" min="0" style="height:32px;font-size:12px;" placeholder="0">
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:18px;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeCommModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveCommModal()">儲存</button>
+    </div>`;
+}
+
+function commPidChanged(){
+  const val=document.getElementById('cm_pid').value;
+  const cg=document.getElementById('cm_pid_custom_group');
+  if(cg)cg.style.display=val==='_custom_'?'block':'none';
+  // auto-fill name
+  const nameEl=document.getElementById('cm_name');
+  if(!nameEl)return;
+  if(val&&val!=='_custom_'){
+    const products=getProducts();
+    const p=products.find(x=>x.id===val);
+    if(p&&!nameEl.value) nameEl.value=p.name;
+    else if(val.startsWith('_cat_')&&!nameEl.value) nameEl.value=val.replace('_cat_','')+'（分類預設）';
+    else if(val.startsWith('_group_')&&!nameEl.value) nameEl.value=val.replace('_group_','')+'（群組預設）';
+  }
+}
+
+function saveCommModal(){
+  let pid=document.getElementById('cm_pid').value;
+  if(pid==='_custom_') pid=document.getElementById('cm_pid_custom')?.value.trim()||'';
+  if(!pid){toast('⚠️ 請選擇套用對象');return;}
+  const rule={
+    productId:pid,
+    productName:document.getElementById('cm_name').value.trim()||pid,
+  };
+  COMM_ROLES.forEach(role=>{
+    rule[role.key+'Type']=document.getElementById('cm_'+role.key+'_type').value;
+    rule[role.key+'Value']=Number(document.getElementById('cm_'+role.key+'_val').value)||0;
+  });
+  if(editingCommIdx>=0) editCommRules[editingCommIdx]=rule;
+  else editCommRules.push(rule);
+  saveCommRules();renderCommPage();closeCommModal();
+  toast('✅ 分潤規則已儲存');
+}
+
+function closeCommModal(){document.getElementById('commModalOverlay').classList.remove('open');}
+
+const DEFAULT_CLINICS=['鶯歌院區','三樹院區','樹林院區','桃園院區','土城院區','八德院區','龍潭院區','大溪院區','大竹院區','大浦院區','平鎮院區','埔心院區'];
+let editClinics=[];
+function loadClinicData(){
+  const s=localStorage.getItem(CLINIC_KEY);
+  editClinics=s?JSON.parse(s):[...DEFAULT_CLINICS];
+  renderClinicChips();
+}
+function renderClinicChips(){
+  const el=document.getElementById('clinicChipList');
+  if(!el)return;
+  el.innerHTML=editClinics.map((n,i)=>`<span class="chip">${n}<button class="chip-del" onclick="removeClinic(${i})">×</button></span>`).join('');
+}
+function addClinic(){
+  const v=document.getElementById('newClinicInput').value.trim();if(!v)return;
+  if(editClinics.includes(v)){toast('⚠️ 已存在');return;}
+  editClinics.push(v);document.getElementById('newClinicInput').value='';renderClinicChips();
+}
+function removeClinic(i){editClinics.splice(i,1);renderClinicChips();}
+function saveClinics(){
+  localStorage.setItem(CLINIC_KEY,JSON.stringify(editClinics));
+  const gasUrl=(typeof APP_CONFIG!=='undefined'?APP_CONFIG.GAS_URL:null)||localStorage.getItem(GS_KEY)||'';
+  if(gasUrl()){
+    const rows=editClinics.map(c=>({'院區名稱':c}));
+    gasWrite('院區清單',['院區名稱'],rows).then(d=>d.status==='ok'?toast('☁️ 院區清單已同步至 Google Sheet'):toast('⚠️ 同步失敗：'+d.msg))
+      .catch(()=>toast('⚠️ 網路錯誤'));
+  } else { toast('✅ 院區清單已儲存'); }
+  const m=document.getElementById('clinicSaveMsg');m.textContent='✅ 已儲存！';setTimeout(()=>m.textContent='',3000);
+}
+let editStaffData={doctors:[],staff:[],nurses:[],pharmas:[]};
+const ROLE_INPUT={doctors:'newDoctorInput',staff:'newStaffInput',nurses:'newNurseInput',pharmas:'newPharmaInput'};
+const ROLE_LIST={doctors:'doctorList',staff:'staffList',nurses:'nurseList',pharmas:'pharmaList'};
+
+async function loadStaffData(){
+  // 先用本機快取顯示，背景從 GAS 更新
+  const s=localStorage.getItem(STAFF_KEY);
+  if(s){const d=JSON.parse(s);editStaffData={doctors:[...(d.doctors||[])],staff:[...(d.staff||[])],nurses:[...(d.nurses||[])],pharmas:[...(d.pharmas||[])]};}
+  renderStaffLists();
+  // 背景同步 GAS 最新資料
+  if(gasUrl()){
+    try{
+      const [sd,cd,pmd,commD]=await Promise.all([gasRead('人員名單'),gasRead('院區清單'),gasRead('促銷活動'),gasRead('分潤規則')]);
+      if(sd.status==='ok'&&sd.rows){
+        const staff={doctors:[],staff:[],nurses:[],pharmas:[]};
+        sd.rows.forEach(r=>{const role=r['角色'],name=String(r['姓名']||'').trim();if(staff[role]!==undefined&&name)staff[role].push(name);});
+        editStaffData=staff;localStorage.setItem(STAFF_KEY,JSON.stringify(staff));renderStaffLists();
+      }
+      if(cd.status==='ok'&&cd.rows){
+        const clinics=cd.rows.map(r=>String(r['院區名稱']||'').trim()).filter(Boolean);
+        if(clinics.length){editClinics=clinics;localStorage.setItem(CLINIC_KEY,JSON.stringify(clinics));renderClinicChips();}
+      }
+      if(pmd.status==='ok'&&pmd.rows){
+        const promos=pmd.rows.map(r=>({...r,buyQty:Number(r.buyQty)||0,freeQty:Number(r.freeQty)||0,discountValue:Number(r.discountValue)||0}));
+        localStorage.setItem(PROMO_KEY,JSON.stringify(promos));
+        editPromos=promos;
+      }
+      if(commD.status==='ok'&&commD.rows&&commD.rows.length){
+        editCommRules=commD.rows.map(r=>({...r,
+          doctorValue:Number(r.doctorValue)||0,staffValue:Number(r.staffValue)||0,
+          nurseValue:Number(r.nurseValue)||0,pharmaValue:Number(r.pharmaValue)||0}));
+        localStorage.setItem(COMM_KEY,JSON.stringify(editCommRules));
+      }
+    }catch(e){console.warn('[staff/clinics/promos/comm] GAS 同步失敗，使用本機快取');}
+  }
+}
+function renderStaffLists(){
+  Object.entries(ROLE_LIST).forEach(([role,listId])=>renderChips(listId,editStaffData[role],role));
+}
+function renderChips(id,list,role){document.getElementById(id).innerHTML=(list||[]).map((n,i)=>`<span class="chip">${n}<button class="chip-del" onclick="removePerson('${role}',${i})">×</button></span>`).join('');}
+function addPerson(role){
+  const inputId=ROLE_INPUT[role];const v=document.getElementById(inputId).value.trim();if(!v)return;
+  if(!editStaffData[role])editStaffData[role]=[];
+  if(editStaffData[role].includes(v)){toast('⚠️ 已存在');return;}
+  editStaffData[role].push(v);document.getElementById(inputId).value='';renderStaffLists();
+}
+function removePerson(role,i){editStaffData[role].splice(i,1);renderStaffLists();}
+function saveStaff(){
+  localStorage.setItem(STAFF_KEY,JSON.stringify(editStaffData));
+  // 同步至 Google Sheet
+  if(gasUrl()){
+    const STAFF_ROLES=['doctors','staff','nurses','pharmas'];
+    const rows=[];
+    STAFF_ROLES.forEach(role=>(editStaffData[role]||[]).forEach(name=>rows.push({'角色':role,'姓名':name})));
+    gasWrite('人員名單',['角色','姓名'],rows).then(d=>{
+      d.status==='ok'?toast('☁️ 人員名單已同步至 Google Sheet'):toast('⚠️ Sheet 同步失敗：'+d.msg);
+    }).catch(()=>toast('⚠️ Sheet 同步網路錯誤'));
+  } else {
+    toast('✅ 人員名單已儲存（未設定 GAS URL）');
+  }
+  const m=document.getElementById('staffSaveMsg');m.textContent='✅ 已儲存！';setTimeout(()=>m.textContent='',3000);
+}
+
+// ── GS ──
+function saveGs(){const u=document.getElementById('gsUrlInput').value.trim();if(!u){toast('⚠️ 請輸入 URL');return;}localStorage.setItem(GS_KEY,u);document.getElementById('gsBadge').classList.add('show');toast('✅ URL 已儲存');}
+async function testGs(){
+  const u=document.getElementById('gsUrlInput').value.trim();if(!u){toast('⚠️ 請先輸入 URL');return;}
+  setGsS('pending','🔄 測試中...');
+  try{
+    const res=await fetch(u+'?ping=1');
+    const d=await res.json();
+    d.status==='ok'?setGsS('ok','✅ 連線成功！'):setGsS('err','❌ 回應異常：'+JSON.stringify(d));
+  }catch(e){setGsS('err','❌ 連線失敗：'+e.message);}
+}
+function setGsS(t,m){const c=t==='ok'?'pill-ok':t==='err'?'pill-err':'pill-pending';document.getElementById('gsStatus').innerHTML=`<span class="status-pill ${c}">${m}</span>`;}
+
+// ── PIN CHANGE ──
+function changePin(){
+  const o=document.getElementById('oldPin').value,n=document.getElementById('newPin').value,c=document.getElementById('confirmPin').value;
+  const m=document.getElementById('pinChangeMsg');
+  if(o!==getPin()){m.innerHTML='<span style="color:var(--red)">❌ 目前 PIN 碼不正確</span>';return;}
+  if(!/^\d{4}$/.test(n)){m.innerHTML='<span style="color:var(--red)">❌ 新 PIN 必須為 4 位數字</span>';return;}
+  if(n!==c){m.innerHTML='<span style="color:var(--red)">❌ 兩次輸入不一致</span>';return;}
+  localStorage.setItem(PIN_KEY,n);['oldPin','newPin','confirmPin'].forEach(id=>document.getElementById(id).value='');
+  m.innerHTML='<span style="color:var(--sage)">✅ PIN 碼已更新！</span>';toast('✅ PIN 碼更新成功');setTimeout(()=>m.innerHTML='',3000);
+}
+
+// ── COPY SCRIPT (動態欄位版) ──
+function copyScript(){
+  const code=`// 擇木良食 × 金鶯診所｜通用版 GAS（只需部署一次，永遠不用改）
+// ─────────────────────────────────────────────────────────────
+// doGet?sheet=工作頁名稱           → 讀取整頁所有資料（JSON）
+// doPost {sheet, headers, rows}    → 覆寫整頁（商品/人員/院區）
+// doPost {sheet, row, append:true} → 新增一列（銷售記錄）
+// ─────────────────────────────────────────────────────────────
+// 工作頁名稱（前後台 JS 定義，GAS 完全不需知道）：
+//   銷售紀錄 / 商品主檔 / 人員名單 / 院區清單
+
+function getOrCreate(name, headers) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let s = ss.getSheetByName(name);
+  if (!s) {
+    s = ss.insertSheet(name);
+    if (headers && headers.length) {
+      s.appendRow(headers);
+      s.getRange('1:1').setFontWeight('bold').setBackground('#2C3E35').setFontColor('#fff');
+      s.setFrozenRows(1);
+    }
+  }
+  return s;
+}
+
+function doGet(e) {
+  try {
+    const p = e.parameter || {};
+    const name = p.sheet || '';
+    // ping 測試：無 sheet 參數時直接回傳連線成功
+    if (!name) return json({ status: 'ok', msg: '連線成功（通用版 GAS）' });
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const s = ss.getSheetByName(name);
+    if (!s) return json({ status: 'ok', rows: [] });
+    const values = s.getDataRange().getValues();
+    const headers = values[0] || [];
+    const rows = values.slice(1).map(r => {
+      const o = {};
+      headers.forEach((h, i) => o[h] = r[i]);
+      return o;
+    });
+    return json({ status: 'ok', headers, rows });
+  } catch (err) { return json({ status: 'error', msg: err.message }); }
+}
+
+function doPost(e) {
+  try {
+    const d = JSON.parse(e.postData.contents);
+    const s = getOrCreate(d.sheet, d.headers || []);
+
+    if (d.append) {
+      // 新增一列模式（銷售記錄）
+      const headers = s.getRange(1, 1, 1, Math.max(s.getLastColumn(), 1)).getValues()[0];
+      // 自動新增尚未存在的商品欄位
+      if (d.ensureCols) {
+        d.ensureCols.forEach(col => {
+          if (!headers.includes(col)) {
+            const idx = headers.indexOf(d.insertBefore || '結帳金額');
+            const at = (idx >= 0 ? idx : headers.length) + 1;
+            s.insertColumnBefore(at);
+            s.getRange(1, at).setValue(col)
+              .setFontWeight('bold').setBackground('#2C3E35').setFontColor('#fff');
+            headers.splice(at - 1, 0, col);
+          }
+        });
+      }
+      s.appendRow(headers.map(h => d.row[h] !== undefined ? d.row[h] : ''));
+      return json({ status: 'ok' });
+    }
+
+    // 覆寫整頁模式（商品 / 人員 / 院區）
+    s.clearContents();
+    if (d.headers && d.headers.length) {
+      s.appendRow(d.headers);
+      s.getRange('1:1').setFontWeight('bold').setBackground('#2C3E35').setFontColor('#fff');
+      s.setFrozenRows(1);
+    }
+    (d.rows || []).forEach(row => {
+      s.appendRow((d.headers || []).map(h => row[h] !== undefined ? row[h] : ''));
+    });
+    return json({ status: 'ok', count: (d.rows || []).length });
+  } catch (err) { return json({ status: 'error', msg: err.message }); }
+}
+
+function json(o) {
+  return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
+}`;
+  navigator.clipboard.writeText(code).then(()=>toast('✅ GAS 程式碼已複製（通用版）'));
+}
+
+
+
+
+// ── TOAST ──
+function toast(msg){const el=document.createElement('div');el.className='toast';el.textContent=msg;document.getElementById('toastWrap').appendChild(el);setTimeout(()=>el.remove(),3000);}
+
+// Auto-refresh
+setInterval(()=>{if(document.getElementById('appShell').classList.contains('visible'))renderStats();},30000);
+</script>
+
+  <!-- Promo Modal -->
+  <div id="promoModalOverlay" class="pm-overlay" onclick="if(event.target===this)closePromoModal()">
+    <div class="pm-modal" id="promoModalBody" style="max-width:560px;"></div>
+  </div>
+
+  <!-- Comm Modal -->
+  <div id="commModalOverlay" class="pm-overlay" onclick="if(event.target===this)closeCommModal()">
+    <div class="pm-modal" id="commModalBody" style="max-width:560px;"></div>
+  </div>
+</body>
+</html>
