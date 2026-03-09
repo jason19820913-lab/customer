@@ -7,7 +7,7 @@
 <script>
 // ── 內嵌設定（無需 config.js）──
 const APP_CONFIG = {
-  GAS_URL: 'https://script.google.com/macros/s/AKfycbwyR1ZBcNCR7yCJH8kmKHCJtB-jE3I2YV6uj-NXjVpCYlCJwV5zDSbBscUmZneOe_Ub/exec'
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbxAr-cNVq6jTNXSRi0MHYsxTOuDrWKsXDMThovhWKHsMYbLpzXDqS8sEqtOCglrH8vA/exec'
 };
 // 自動寫入 localStorage，確保所有裝置皆可使用
 try { localStorage.setItem('gsUrl', APP_CONFIG.GAS_URL); } catch(e) {}
@@ -58,7 +58,7 @@ header{background:var(--charcoal);height:var(--hh);padding:0 16px;display:flex;a
 @media(min-width:1100px){.sidebar{width:320px;}}
 
 /* CARD */
-.card{background:#fff;border-radius:var(--r);box-shadow:var(--sh-sm);margin-bottom:12px;overflow:hidden;border:1px solid #E8EEE9;}
+.card{background:#fff;border-radius:var(--r);box-shadow:var(--sh-sm);margin-bottom:12px;overflow:visible;border:1px solid #E8EEE9;}
 .card-header{background:var(--sage-pale);padding:10px 14px;display:flex;align-items:center;gap:7px;border-bottom:1px solid #D8EAD9;}
 .card-header-icon{font-size:13px;}.card-header-title{font-size:11px;font-weight:700;letter-spacing:.5px;}
 .card-body{padding:13px;}
@@ -75,7 +75,7 @@ header{background:var(--charcoal);height:var(--hh);padding:0 16px;display:flex;a
 .fg-input{height:36px;border:1.5px solid #D8E8DA;border-radius:var(--r-sm);padding:0 10px;font-family:inherit;font-size:12px;color:var(--charcoal);background:var(--cream);outline:none;transition:border-color .2s,box-shadow .2s;-webkit-appearance:none;appearance:none;}
 .fg-input:focus{border-color:var(--sage);box-shadow:0 0 0 3px rgba(107,143,113,.15);background:#fff;}
 select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236B8F71' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;padding-right:26px;}
-.search-dd{position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--sage);border-radius:var(--r-sm);box-shadow:var(--sh-md);z-index:50;max-height:180px;overflow-y:auto;display:none;margin-top:2px;}
+.search-dd{position:fixed;background:#fff;border:1.5px solid var(--sage);border-radius:var(--r-sm);box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:999;max-height:220px;overflow-y:auto;display:none;margin-top:2px;}
 .search-dd.open{display:block;}
 .dd-item{padding:7px 11px;font-size:11px;cursor:pointer;border-bottom:1px solid #F0F4F1;transition:background .1s;}
 .dd-item:last-child{border-bottom:none;}
@@ -586,11 +586,27 @@ function renderDD(type,filter=''){
     ?`<div class="dd-empty">找不到「${filter}」</div>`
     :filtered.map(n=>`<div class="dd-item${n===ddState[type]?' sel':''}" onmousedown="selPerson('${type}','${n}')">${n}</div>`).join('');
 }
-function showDD(t){renderDD(t,document.getElementById(t+'Input').value);document.getElementById(t+'Dd').classList.add('open');}
+function showDD(t){
+  renderDD(t,document.getElementById(t+'Input').value);
+  const input=document.getElementById(t+'Input');
+  const dd=document.getElementById(t+'Dd');
+  const rect=input.getBoundingClientRect();
+  dd.style.left=rect.left+'px';
+  dd.style.top=(rect.bottom+4)+'px';
+  dd.style.width=rect.width+'px';
+  dd.classList.add('open');
+}
 function hideDD(t,d=0){setTimeout(()=>document.getElementById(t+'Dd').classList.remove('open'),d);}
 function filterDD(t){
   const v=document.getElementById(t+'Input').value;
-  renderDD(t,v);document.getElementById(t+'Dd').classList.add('open');
+  renderDD(t,v);
+  const input=document.getElementById(t+'Input');
+  const dd=document.getElementById(t+'Dd');
+  const rect=input.getBoundingClientRect();
+  dd.style.left=rect.left+'px';
+  dd.style.top=(rect.bottom+4)+'px';
+  dd.style.width=rect.width+'px';
+  dd.classList.add('open');
   if(v!==ddState[t]){ddState[t]='';document.getElementById(t+'Select').value='';if(t==='doctor')onStaffChange();}
 }
 function selPerson(t,n){
@@ -598,6 +614,10 @@ function selPerson(t,n){
   document.getElementById(t+'Dd').classList.remove('open');
   if(t==='doctor')onStaffChange();renderSidebar();
 }
+// 捲動時關閉所有下拉
+window.addEventListener('scroll',()=>['doctor','staff','nurse','pharma'].forEach(t=>{
+  const dd=document.getElementById(t+'Dd');if(dd)dd.classList.remove('open');
+}),true);
 function onStaffChange(){document.getElementById('doctorBadge').textContent=document.getElementById('doctorSelect').value||'尚未設定醫師';renderSidebar();}
 function onCustomerChange(){renderSidebar();}
 
