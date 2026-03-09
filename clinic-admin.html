@@ -839,10 +839,59 @@ let activeCF='';
 function filterClinic(c,btn){activeCF=c;document.querySelectorAll('.clinic-filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderStats();}
 
 const COMM_RULES={'複方蛋白粉':{dr:100,st:20,ph:0},'蛋白代餐':{dr:100,st:10,ph:0},'Q飽纖燃飲':{dr:100,st:10,ph:0},'健健糖':{dr:50,st:10,ph:0},'蛋白棒':{dr:50,st:10,ph:0},'防蚊液':{dr:0,st:0,ph:30},'金鶯涼喉':{dr:0,st:0,ph:10},'好燃對策':{dr:0,st:0,ph:100},'碳水對策':{dr:0,st:0,ph:100},'好輕鬆':{dr:0,st:0,ph:50},'好元氣':{dr:0,st:0,ph:50},'甘好睡寶':{dr:0,st:0,ph:100},'中碳套組':{dr:100,st:10,ph:0},'低碳套組':{dr:100,st:10,ph:0},'拿鐵蛋白棒':{dr:50,st:10,ph:0},'健健粉':{dr:50,st:10,ph:0}};
-function calcComm(str){
-  let dr=0,st=0,nu=0,ph=0;if(!str)return{dr,st,ph};
-  str.split('、').forEach(part=>{const m=part.match(/^(.+?)×(\d+)/);if(!m)return;const name=m[1].trim(),qty=parseInt(m[2])||1;for(const[k,r]of Object.entries(COMM_RULES)){if(name.includes(k)||k.includes(name)){dr+=r.dr*qty;st+=r.st*qty;ph+=r.ph*qty;break;}}});
-  return{dr,st,ph};
+// ── 後台分潤計算（與前台邏輯一致）──
+function getAdminProducts(){ try{const s=localStorage.getItem(PRODUCTS_KEY);return s?JSON.parse(s):[];}catch(e){return[];} }
+function getAdminCommRules(){ try{const s=localStorage.getItem(COMM_KEY);return s?JSON.parse(s):[];}catch(e){return[];} }
+
+function calcOneRuleAdmin(rule, salePrice, qty, lineTotal){
+  const type=rule.commType||'fixed', val=Number(rule.commValue)||0, thres=Number(rule.commThreshold)||0;
+  if(type==='percent')    return Math.round(salePrice*val/100)*qty;
+  if(type==='threshold')  return (lineTotal>=thres&&thres>0)?val:0;
+  if(type==='salesStage') return (lineTotal>=thres&&thres>0)?val:0;
+  if(type==='salesAmount') return thres>0?Math.floor(lineTotal/thres)*val:0;
+  return val*qty;
+}
+
+function findCommRulesAdmin(product){
+  const rules=getAdminCommRules();
+  const priority=id=>id===product.id?0:id.startsWith('_cat_')?1:id.startsWith('_group_')?2:id==='_all_'?3:4;
+  const byRole={};
+  rules.forEach(r=>{
+    const pid=r.productId||'';
+    if(pid===product.id||pid==='_cat_'+product.cat||pid==='_group_'+product.group||pid==='_all_'){
+      const ex=byRole[r.role];
+      if(!ex||priority(pid)<priority(ex.productId)) byRole[r.role]=r;
+    }
+  });
+  return Object.values(byRole);
+}
+
+function calcComm(itemsStr, hasDoctor, hasStaff, hasNurse, hasPharma){
+  const products=getAdminProducts();
+  let dr=0,st=0,nu=0,ph=0;
+  if(!itemsStr) return{dr,st,nu,ph};
+  const filled={doctor:hasDoctor,staff:hasStaff,nurse:hasNurse,pharma:hasPharma};
+  itemsStr.split('、').forEach(part=>{
+    const m=part.match(/^(.+?)×(\d+)/);if(!m)return;
+    const rawName=m[1].trim(), qty=parseInt(m[2])||1;
+    // 支援「分類-名稱」格式：先嘗試全名，再嘗試去掉分類前綴
+    let product=products.find(p=>p.name===rawName||(p.cat&&p.cat+'-'+p.name===rawName));
+    if(!product&&rawName.includes('-')){
+      const shortName=rawName.split('-').slice(1).join('-');
+      product=products.find(p=>p.name===shortName);
+    }
+    if(!product) return;
+    const price=product.price||0, lineTotal=price*qty;
+    findCommRulesAdmin(product).forEach(rule=>{
+      if(filled[rule.role]===false) return; // 明確傳 false 才跳過；undefined 時（舊資料fallback）不跳過
+      const amt=calcOneRuleAdmin(rule,price,qty,lineTotal);
+      if(rule.role==='doctor') dr+=amt;
+      else if(rule.role==='staff')  st+=amt;
+      else if(rule.role==='nurse')  nu+=amt;
+      else if(rule.role==='pharma') ph+=amt;
+    });
+  });
+  return{dr,st,nu,ph};
 }
 function getQty(e,key){
   if(e.itemQty&&e.itemQty[key]!==undefined)return e.itemQty[key]||0;
@@ -851,17 +900,14 @@ function getQty(e,key){
   return m?parseInt(m[1]):0;
 }
 
-// 從 entry 取得四個角色的抽成（有記錄就用記錄值，無則依分潤規則即時計算）
+// 從 entry 取得四個角色的抽成
 function getEntryComm(e){
-  // 優先使用已記錄的抽成值（結帳時依人員填報計算）
+  // 優先使用結帳時已計算並儲存的值
   if(e.doctorComm!==undefined||e.staffComm!==undefined||e.nurseComm!==undefined||e.pharmaComm!==undefined){
-    return {dr:e.doctorComm||0, st:e.staffComm||0, nu:e.nurseComm||0, ph:e.pharmaComm||0};
+    return {dr:Number(e.doctorComm)||0, st:Number(e.staffComm)||0, nu:Number(e.nurseComm)||0, ph:Number(e.pharmaComm)||0};
   }
-  // fallback：依分潤規則即時計算（傳入人員填報狀態）
-  return calcComm(
-    e.items||'',
-    !!e.doctor, !!e.staff, !!e.nurse, !!e.pharma
-  );
+  // fallback：舊資料沒有抽成紀錄，依分潤規則+人員填報即時計算
+  return calcComm(e.items||'', !!e.doctor, !!e.staff, !!e.nurse, !!e.pharma);
 }
 
 function renderStats(){
@@ -878,8 +924,8 @@ function renderStats(){
   document.getElementById('statNu').textContent='NT$'+tnu.toLocaleString();
   document.getElementById('statPh').textContent='NT$'+tph.toLocaleString();
 
-  // 表格動態欄：從商品主檔讀取，格式 分類-名稱
-  const products=getProducts().filter(p=>p.active!==false);
+  // 表格動態欄：從商品主檔讀取，key 格式與 itemQty 完全一致（分類-名稱）
+  const products=getAdminProducts().filter(p=>p.active!==false);
   const statKeys=[];
   products.forEach(p=>{
     const k=p.cat?`${p.cat}-${p.name}`:p.name;
