@@ -184,6 +184,11 @@ tbody tr:hover td{background:var(--sage-pale);}
 .pm-item[draggable="true"]{user-select:none;}
 .pm-item.drag-over{border-top:2px solid var(--sage);background:var(--sage-pale);}
 .pm-cat-body.drag-over-body{background:var(--sage-pale);outline:2px dashed var(--sage-light);}
+.pm-grid.cat-drag-over{outline:2px solid var(--sage);border-radius:var(--r);opacity:.85;}
+.pm-grid.cat-dragging{opacity:.4;}
+.pm-cat-header{cursor:default;}
+.pm-cat-drag{cursor:grab;color:#bbb;font-size:14px;flex-shrink:0;margin-right:6px;user-select:none;}
+.pm-cat-drag:active{cursor:grabbing;}
 .pm-drag{cursor:grab;color:#ccc;font-size:16px;flex-shrink:0;}
 .pm-drag:active{cursor:grabbing;}
 .pm-emoji{font-size:20px;width:28px;text-align:center;flex-shrink:0;}
@@ -1134,10 +1139,11 @@ function renderProductManager(){
   const GROUP_LABEL={'protein':'蛋白代餐（買6送1）','mct':'Q飽（買6送1）','package':'套組','capsule':'膠囊','other':'其他'};
 
   document.getElementById('pmList').innerHTML=cats.map(cat=>`
-    <div class="pm-grid" style="margin-bottom:12px;" data-cat="${cat}">
-      <div class="pm-cat-header">
-        <span>${CAT_EMOJI[cat]||'🛍️'} ${cat}</span>
-        <span style="font-size:10px;color:var(--sage);">${groups[cat].length} 項 <span style="color:#bbb;font-weight:400;">｜ 拖曳 ☰ 排序</span></span>
+    <div class="pm-grid" style="margin-bottom:12px;" data-cat="${cat}" draggable="false">
+      <div class="pm-cat-header" style="display:flex;align-items:center;gap:6px;">
+        <span class="pm-cat-drag" title="拖曳移動分類順序">⠿</span>
+        <span style="flex:1;">${CAT_EMOJI[cat]||'🛍️'} ${cat}</span>
+        <span style="font-size:10px;color:var(--sage);">${groups[cat].length} 項 <span style="color:#bbb;font-weight:400;">｜ 拖曳 ⠿ 移動分類</span></span>
       </div>
       <div class="pm-cat-body" data-cat="${cat}">
         ${groups[cat].map(p=>`
@@ -1205,6 +1211,58 @@ function initDragSort(){
       saveProducts(products);
       renderProductManager();
       toast('✅ 順序已更新');
+    });
+  });
+
+  // ── 分類拖曳排序 ──
+  let catDragSrc=null;
+  document.querySelectorAll('.pm-cat-drag').forEach(handle=>{
+    const grid=handle.closest('.pm-grid');
+    if(!grid) return;
+    handle.addEventListener('mousedown',()=>{ grid.setAttribute('draggable','true'); });
+    handle.addEventListener('mouseleave',()=>{ if(catDragSrc!==grid) grid.setAttribute('draggable','false'); });
+    grid.addEventListener('dragstart',e=>{
+      // 只允許從 cat-drag 把手觸發
+      if(!grid.getAttribute('draggable')||grid.getAttribute('draggable')==='false'){ e.preventDefault(); return; }
+      catDragSrc=grid;
+      grid.classList.add('cat-dragging');
+      e.dataTransfer.effectAllowed='move';
+      e.dataTransfer.setData('cat-drag', grid.dataset.cat);
+      e.stopPropagation();
+    });
+    grid.addEventListener('dragend',e=>{
+      grid.classList.remove('cat-dragging');
+      grid.setAttribute('draggable','false');
+      document.querySelectorAll('.pm-grid').forEach(g=>g.classList.remove('cat-drag-over'));
+      catDragSrc=null;
+    });
+    grid.addEventListener('dragover',e=>{
+      if(!catDragSrc||catDragSrc===grid) return;
+      if(!e.dataTransfer.types.includes('cat-drag')) return;
+      e.preventDefault(); e.stopPropagation();
+      document.querySelectorAll('.pm-grid').forEach(g=>g.classList.remove('cat-drag-over'));
+      grid.classList.add('cat-drag-over');
+    });
+    grid.addEventListener('dragleave',e=>{
+      if(!grid.contains(e.relatedTarget)) grid.classList.remove('cat-drag-over');
+    });
+    grid.addEventListener('drop',e=>{
+      if(!catDragSrc||catDragSrc===grid) return;
+      if(!e.dataTransfer.types.includes('cat-drag')) return;
+      e.preventDefault(); e.stopPropagation();
+      grid.classList.remove('cat-drag-over');
+      const srcCat=catDragSrc.dataset.cat;
+      const tgtCat=grid.dataset.cat;
+      // 重新排列 products 陣列：把 srcCat 所有商品移到 tgtCat 之前
+      const products=getProducts();
+      const srcItems=products.filter(p=>p.cat===srcCat);
+      const rest=products.filter(p=>p.cat!==srcCat);
+      const tgtFirstIdx=rest.findIndex(p=>p.cat===tgtCat);
+      if(tgtFirstIdx<0){ rest.push(...srcItems); }
+      else { rest.splice(tgtFirstIdx,0,...srcItems); }
+      saveProducts(rest);
+      renderProductManager();
+      toast('✅ 分類順序已更新');
     });
   });
 
