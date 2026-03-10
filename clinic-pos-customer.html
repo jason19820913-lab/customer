@@ -532,7 +532,8 @@ function buildProductUI(){
 
 function renderGrid(el,items){
   el.innerHTML=items.map(p=>`
-    <div class="product-card${(cart[p.id]||0)>0?' selected':''}" id="card-${p.id}" onclick="toggle('${p.id}')">
+    <div class="product-card${(cart[p.id]||0)>0?' selected':''}" id="card-${p.id}" onclick="toggle('${p.id}')" style="position:relative;">
+      ${p.badge?`<div class="product-badge">${p.badge}</div>`:''}
       <span class="product-emoji">${p.emoji||'📦'}</span>
       <div class="product-name">${p.name}</div>
       ${p.detail?`<div class="product-detail">${p.detail}</div>`:''}
