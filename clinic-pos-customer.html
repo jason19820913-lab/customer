@@ -75,9 +75,9 @@ header{background:var(--charcoal);height:var(--hh);padding:0 16px;display:flex;a
 .fg-input{height:36px;border:1.5px solid #D8E8DA;border-radius:var(--r-sm);padding:0 10px;font-family:inherit;font-size:12px;color:var(--charcoal);background:var(--cream);outline:none;transition:border-color .2s,box-shadow .2s;-webkit-appearance:none;appearance:none;}
 .fg-input:focus{border-color:var(--sage);box-shadow:0 0 0 3px rgba(107,143,113,.15);background:#fff;}
 select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236B8F71' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;padding-right:26px;}
-.search-dd{position:fixed;background:#fff;border:1.5px solid var(--sage);border-radius:var(--r-sm);box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:999;max-height:220px;overflow-y:auto;display:none;margin-top:2px;}
+.search-dd{position:fixed;background:#fff;border:1.5px solid var(--sage);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:999;height:240px;overflow-y:scroll;display:none;margin-top:4px;overscroll-behavior:contain;}
 .search-dd.open{display:block;}
-.dd-item{padding:7px 11px;font-size:11px;cursor:pointer;border-bottom:1px solid #F0F4F1;transition:background .1s;}
+.dd-item{padding:11px 14px;font-size:13px;cursor:pointer;border-bottom:1px solid #F0F4F1;transition:background .1s;}
 .dd-item:last-child{border-bottom:none;}
 .dd-item:hover,.dd-item.sel{background:var(--sage-pale);color:var(--sage);font-weight:600;}
 .dd-empty{padding:7px 11px;font-size:10px;color:#aaa;text-align:center;}
@@ -230,14 +230,14 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
           <div class="form-group">
             <label>當班醫師</label>
             <input class="fg-input" type="text" id="doctorInput" placeholder="搜尋醫師..." autocomplete="off"
-              oninput="filterDD('doctor')" onfocus="showDD('doctor')" onblur="hideDD('doctor',300)">
+              oninput="filterDD('doctor')" onfocus="showDD('doctor')" autocomplete="off">
             <div class="search-dd" id="doctorDd"></div>
             <input type="hidden" id="doctorSelect">
           </div>
           <div class="form-group">
             <label>櫃檯人員</label>
             <input class="fg-input" type="text" id="staffInput" placeholder="搜尋人員..." autocomplete="off"
-              oninput="filterDD('staff')" onfocus="showDD('staff')" onblur="hideDD('staff',300)">
+              oninput="filterDD('staff')" onfocus="showDD('staff')" autocomplete="off">
             <div class="search-dd" id="staffDd"></div>
             <input type="hidden" id="staffSelect">
           </div>
@@ -246,14 +246,14 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
           <div class="form-group">
             <label>護理師</label>
             <input class="fg-input" type="text" id="nurseInput" placeholder="搜尋護理師..." autocomplete="off"
-              oninput="filterDD('nurse')" onfocus="showDD('nurse')" onblur="hideDD('nurse',300)">
+              oninput="filterDD('nurse')" onfocus="showDD('nurse')" autocomplete="off">
             <div class="search-dd" id="nurseDd"></div>
             <input type="hidden" id="nurseSelect">
           </div>
           <div class="form-group">
             <label>藥師</label>
             <input class="fg-input" type="text" id="pharmaInput" placeholder="搜尋藥師..." autocomplete="off"
-              oninput="filterDD('pharma')" onfocus="showDD('pharma')" onblur="hideDD('pharma',300)">
+              oninput="filterDD('pharma')" onfocus="showDD('pharma')" autocomplete="off">
             <div class="search-dd" id="pharmaDd"></div>
             <input type="hidden" id="pharmaSelect">
           </div>
@@ -591,9 +591,13 @@ function showDD(t){
   const input=document.getElementById(t+'Input');
   const dd=document.getElementById(t+'Dd');
   const rect=input.getBoundingClientRect();
+  const ddH=244; // dropdown 高度
+  // 空間不夠往下開時，改往上開
+  const spaceBelow=window.innerHeight-rect.bottom-8;
+  const top=spaceBelow>=ddH?rect.bottom+4:rect.top-ddH-4;
   dd.style.left=rect.left+'px';
-  dd.style.top=(rect.bottom+4)+'px';
-  dd.style.width=rect.width+'px';
+  dd.style.top=Math.max(8,top)+'px';
+  dd.style.width=Math.max(180,rect.width)+'px';
   dd.classList.add('open');
 }
 function hideDD(t,d=0){setTimeout(()=>document.getElementById(t+'Dd').classList.remove('open'),d);}
@@ -603,9 +607,12 @@ function filterDD(t){
   const input=document.getElementById(t+'Input');
   const dd=document.getElementById(t+'Dd');
   const rect=input.getBoundingClientRect();
+  const ddH=244;
+  const spaceBelow=window.innerHeight-rect.bottom-8;
+  const top=spaceBelow>=ddH?rect.bottom+4:rect.top-ddH-4;
   dd.style.left=rect.left+'px';
-  dd.style.top=(rect.bottom+4)+'px';
-  dd.style.width=rect.width+'px';
+  dd.style.top=Math.max(8,top)+'px';
+  dd.style.width=Math.max(180,rect.width)+'px';
   dd.classList.add('open');
   if(v!==ddState[t]){ddState[t]='';document.getElementById(t+'Select').value='';if(t==='doctor')onStaffChange();}
 }
@@ -614,10 +621,16 @@ function selPerson(t,n){
   document.getElementById(t+'Dd').classList.remove('open');
   if(t==='doctor')onStaffChange();renderSidebar();
 }
-// 捲動時關閉所有下拉
-window.addEventListener('scroll',()=>['doctor','staff','nurse','pharma'].forEach(t=>{
-  const dd=document.getElementById(t+'Dd');if(dd)dd.classList.remove('open');
-}),true);
+// 點擊下拉外部才關閉（捲動不關閉）
+document.addEventListener('mousedown',e=>{
+  ['doctor','staff','nurse','pharma'].forEach(t=>{
+    const input=document.getElementById(t+'Input');
+    const dd=document.getElementById(t+'Dd');
+    if(!dd||!dd.classList.contains('open'))return;
+    if(dd.contains(e.target)||input.contains(e.target))return; // 點 dd 或 input 自身不關
+    dd.classList.remove('open');
+  });
+});
 function onStaffChange(){document.getElementById('doctorBadge').textContent=document.getElementById('doctorSelect').value||'尚未設定醫師';renderSidebar();}
 function onCustomerChange(){renderSidebar();}
 
