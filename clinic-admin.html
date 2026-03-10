@@ -663,8 +663,18 @@ function json(o) {
     <div class="pm-form-grid full" id="pmDetailGroup" style="display:none;">
       <div class="fg"><label>套組說明（選填）</label><input type="text" id="pmDetail" placeholder="例：14包蛋白代餐｜一天兩次"></div>
     </div>
-    <div class="pm-form-grid full" id="pmBadgeGroup" style="display:none;">
-      <div class="fg"><label>標籤（選填，如：熱銷、推薦）</label><input type="text" id="pmBadge" placeholder="例：熱銷"></div>
+    <div class="pm-form-grid" style="grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="fg">
+        <label>標籤 <span style="font-size:9px;color:#888;">（顯示於商品右上角，如：熱銷、推薦、新品、限量）</span></label>
+        <input type="text" id="pmBadge" placeholder="例：熱銷（留空則不顯示）" style="font-size:13px;" oninput="updateBadgePreview()">
+      </div>
+      <div class="fg" style="display:flex;flex-direction:column;justify-content:flex-end;">
+        <div style="font-size:10px;color:#888;margin-bottom:6px;">預覽</div>
+        <div style="position:relative;display:inline-flex;align-items:center;gap:6px;">
+          <span id="pmBadgePreview" style="display:none;background:var(--gold);color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:7px;"></span>
+          <span id="pmBadgeEmpty" style="font-size:11px;color:#ccc;">（空白）</span>
+        </div>
+      </div>
     </div>
     <div class="pm-form-grid full">
       <div class="fg"><label>分類介紹 <span style="font-size:9px;color:#888;">（顯示於前台分類頁頂端，同分類共用同一段介紹）</span></label><textarea id="pmCatDesc" rows="2" style="width:100%;resize:vertical;padding:8px;border:1px solid #dde4de;border-radius:8px;font-size:12px;font-family:inherit;" placeholder="例：每份含20克蛋白質+10克纖維，買6送1特惠"></textarea></div>
@@ -1331,22 +1341,30 @@ function openProductModal(id=null,defaultCat=''){
     document.getElementById('pmPrice').value=p.price;
     document.getElementById('pmGroup').value=p.group;
     document.getElementById('pmDetail').value=p.detail||'';
-    document.getElementById('pmBadge').value=p.badge||'';
+    document.getElementById('pmBadge').value=p.badge||'';updateBadgePreview();
     document.getElementById('pmCatDesc').value=p.catDescription||'';
   }else{
     document.getElementById('pmModalTitle').textContent='新增商品';
-    ['pmName','pmEmoji','pmDetail','pmBadge','pmCatDesc'].forEach(i=>document.getElementById(i).value='');
+    ['pmName','pmEmoji','pmDetail','pmBadge','pmCatDesc'].forEach(i=>document.getElementById(i).value='');updateBadgePreview();
     document.getElementById('pmPrice').value='';
     document.getElementById('pmGroup').value='other';
   }
   updatePmFields();
+}
+function updateBadgePreview(){
+  const v=document.getElementById('pmBadge')?.value?.trim()||'';
+  const prev=document.getElementById('pmBadgePreview');
+  const empty=document.getElementById('pmBadgeEmpty');
+  if(!prev)return;
+  if(v){prev.textContent=v;prev.style.display='';if(empty)empty.style.display='none';}
+  else{prev.style.display='none';if(empty)empty.style.display='';}
 }
 function closePmModal(){document.getElementById('pmModal').classList.remove('open');editingProductId=null;}
 function updatePmFields(){
   const grp=document.getElementById('pmGroup').value;
   const isPkg=grp==='package';
   document.getElementById('pmDetailGroup').style.display=isPkg?'block':'none';
-  document.getElementById('pmBadgeGroup').style.display=isPkg?'block':'none';
+  // badge 永遠顯示，不需要控制
   const catVal=document.getElementById('pmCat').value;
   document.getElementById('pmNewCatGroup').style.display=catVal==='_new'?'block':'none';
 }
