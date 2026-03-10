@@ -965,7 +965,7 @@ function renderStats(){
   tbody.innerHTML=[...log].reverse().map(e=>{
     const cm=getEntryComm(e);
     return`<tr>
-      <td style="white-space:nowrap;">${e.time||''}</td>
+      <td style="white-space:nowrap;">${fmtTime(e.time)||''}</td>
       <td><span style="font-size:10px;background:var(--sage-pale);color:var(--sage);padding:2px 7px;border-radius:9px;font-weight:600;white-space:nowrap;">${e.clinic||'-'}</span></td>
       <td><strong>${e.customer||''}</strong>${e.phone?`<br><span style="color:#aaa;font-size:9px;">病歷號：${e.phone}</span>`:''}</td>
       <td style="white-space:nowrap;">${e.doctor||'-'}</td>
@@ -982,6 +982,19 @@ function renderStats(){
 function clearLog(){if(!confirm('確定要清除所有銷售紀錄嗎？'))return;localStorage.setItem(SALES_KEY,'[]');renderStats();toast('🗑️ 紀錄已清除');}
 
 // ── PATIENT LOOKUP ──
+// 格式化 Google Sheet 回傳的日期/時間
+function fmtDate(v){
+  if(!v||v==='')return '';
+  const s=String(v);
+  if(s.includes('T')){try{const d=new Date(s);if(!isNaN(d))return d.toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'});}catch(e){}}
+  return s;
+}
+function fmtTime(v){
+  if(!v||v==='')return '';
+  const s=String(v);
+  if(s.includes('T')){try{const d=new Date(s);if(!isNaN(d))return d.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});}catch(e){}}
+  return s;
+}
 async function hashId(id){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(id.toUpperCase()));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,16);}
 function maskId(id){if(!id||id.length<4)return id;return id.slice(0,3)+'****'+id.slice(-3);}
 
@@ -1076,7 +1089,7 @@ async function renderPatientResult(records, label, mode, source){
   document.getElementById('adminPatientBody').innerHTML=[...records].reverse().map(e=>{
     const m=parseItems(e.items||'');
     return`<tr>
-      <td style="white-space:nowrap;">${e.date||''}</td>
+      <td style="white-space:nowrap;">${fmtDate(e.date)||''}</td>
       <td><span style="font-size:10px;background:var(--sage-pale);color:var(--sage);padding:2px 7px;border-radius:9px;font-weight:600;">${e.clinic||'-'}</span></td>
       <td style="white-space:nowrap;">${e.doctor||''}</td>
       ${seenP.map(p=>m[p]?`<td style="text-align:center;"><strong style="color:var(--sage);">${m[p]}</strong></td>`:`<td style="text-align:center;color:#ddd;">—</td>`).join('')}
@@ -1109,15 +1122,22 @@ function renderPatientResultRaw(rows, headers, label, source){
   const COMM_COLS=['醫師抽成','櫃檯抽成','護理師抽成','藥師抽成','員工抽成','護理抽成'];
   const MONEY_COLS=['結帳金額',...COMM_COLS];
   const BADGE_COLS=['院區','付款方式'];
+
+  // 使用全域 fmtDate / fmtTime
+
   document.getElementById('patientThead').innerHTML=`<tr>${headers.map(h=>`<th style="white-space:nowrap;font-size:11px;">${h}</th>`).join('')}</tr>`;
   document.getElementById('adminPatientBody').innerHTML=[...rows].reverse().map(r=>`<tr>${
     headers.map(h=>{
-      const v=String(r[h]??'');
+      const raw=r[h]??'';
+      // 日期/時間特別處理
+      if(h==='日期') return `<td style="white-space:nowrap;font-size:12px;">${fmtDate(raw)||'—'}</td>`;
+      if(h==='時間') return `<td style="white-space:nowrap;font-size:12px;">${fmtTime(raw)||'—'}</td>`;
+      const v=String(raw);
       if(MONEY_COLS.includes(h) && Number(v)>0)
         return `<td style="white-space:nowrap;text-align:right;"><strong style="color:${['結帳金額'].includes(h)?'var(--sage)':'#888'};">NT$${Number(v).toLocaleString()}</strong></td>`;
       if(BADGE_COLS.includes(h) && v)
         return `<td><span style="font-size:10px;background:var(--sage-pale);color:var(--sage);padding:2px 7px;border-radius:9px;font-weight:600;">${v}</span></td>`;
-      if(!isNaN(Number(v)) && Number(v)>0 && !['日期','時間','病歷號'].includes(h))
+      if(!isNaN(Number(v)) && Number(v)>0 && !['病歷號'].includes(h))
         return `<td style="text-align:center;"><strong style="color:var(--sage);">${v}</strong></td>`;
       if(v===''||v==='0')
         return `<td style="text-align:center;color:#ddd;">—</td>`;
