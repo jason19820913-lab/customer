@@ -997,33 +997,44 @@ async function adminLookup(mode){
   const statusEl=document.getElementById('adminLookupStatus');
 
   if(mode==='chart'){
-    // 病歷號查詢：直接比對 phone 欄位（病歷號存在 phone 欄）
     const chartNum=document.getElementById('adminChartInput').value.trim();
     if(!chartNum){toast('⚠️ 請輸入病歷號');return;}
-    statusEl.innerHTML='<span style="color:#888;">🔄 查詢中...</span>';
-    const log=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
-    const records=log.filter(e=>(e.phone||'').trim()===chartNum);
-    if(!records.length){
-      // 嘗試從 Sheet 查詢（病歷號）
-      let sheetRecords=[];
-      try{
-        const res=await fetch(`${gasUrl()}?sheet=銷售紀錄`);
-        const d=await res.json();
-        if(d.status==='ok'&&d.rows){
-          sheetRecords=d.rows.filter(r=>String(r['病歷號']||'').trim()===chartNum)
-            .map(r=>({date:r['日期'],time:r['時間'],clinic:r['院區'],customer:r['顧客姓名'],
-              phone:r['病歷號'],doctor:r['當班醫師'],staff:r['櫃檯人員'],
-              total:Number(r['結帳金額'])||0,payMethod:r['付款方式'],
-              items:Object.entries(r).filter(([k,v])=>!['日期','時間','院區','顧客姓名','身分證遮罩','病歷號','當班醫師','櫃檯人員','結帳金額','付款方式','醫師抽成','櫃檯抽成','護理師抽成','藥師抽成','身分證雜湊'].includes(k)&&Number(v)>0).map(([k,v])=>`${k}×${v}`).join('、')}));
+    statusEl.innerHTML='<span style="color:#888;">🔄 從 Google Sheet 查詢中...</span>';
+
+    const url=gasUrl();
+    if(!url){
+      statusEl.innerHTML='<span style="color:var(--red);">❌ 尚未設定 Google Sheet，請至系統設定</span>';
+      return;
+    }
+
+    try{
+      const res=await fetch(`${url}?sheet=${encodeURIComponent('銷售紀錄')}`);
+      const d=await res.json();
+      if(d.status==='ok' && d.rows && d.headers){
+        const SKIP=['身分證雜湊'];
+        const headers=d.headers.filter(h=>!SKIP.includes(h));
+        const matched=d.rows.filter(r=>String(r['病歷號']||'').trim()===chartNum);
+        if(matched.length){
+          renderPatientResultRaw(matched, headers, chartNum, 'sheets');
+          return;
         }
-      }catch(e){}
-      if(!sheetRecords.length){
-        statusEl.innerHTML=`<span style="color:var(--red);">❌ 查無病歷號「${chartNum}」的購買紀錄</span>`;
+        statusEl.innerHTML=`<span style="color:var(--red);">❌ Google Sheet 查無病歷號「${chartNum}」的購買紀錄</span>`;
+        document.getElementById('adminPatientResult').style.display='none';
+        return;
+      }
+      throw new Error(d.msg||'回傳格式錯誤');
+    }catch(e){
+      console.warn('Sheet 病歷號查詢失敗',e);
+      statusEl.innerHTML='<span style="color:#E65100;">⚠️ Google Sheet 無法連線，改查本機資料...</span>';
+      const log=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
+      const fallback=log.filter(e=>(e.phone||'').trim()===chartNum);
+      if(!fallback.length){
+        statusEl.innerHTML=`<span style="color:var(--red);">❌ 本機亦查無病歷號「${chartNum}」的購買紀錄</span>`;
         document.getElementById('adminPatientResult').style.display='none';return;
       }
-      renderPatientResult(sheetRecords, chartNum, 'chart', 'sheets');return;
+      renderPatientResult(fallback, chartNum, 'chart', 'local');
     }
-    renderPatientResult(records, chartNum, 'chart', 'local');return;
+    return;
   }
 
   // 身分證查詢（原邏輯）
