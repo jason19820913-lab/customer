@@ -50,6 +50,9 @@ header{background:var(--charcoal);height:var(--hh);padding:0 16px;display:flex;a
 .layout{display:flex;flex-direction:column;}
 .content{padding:12px;flex:1;}
 .sidebar{background:var(--warm-white);border-top:2px solid #E0E8E2;}
+.sb-head{flex-shrink:0;padding:14px 16px 8px;border-bottom:1px solid #E8EEE9;}
+.order-list{flex:1;overflow-y:auto;padding:6px 8px;min-height:0;}
+.payment-panel{flex-shrink:0;padding:10px 14px 14px;border-top:1px solid #E8EEE9;background:var(--warm-white);}
 @media(min-width:768px){
   .layout{flex-direction:row;min-height:calc(100vh - var(--hh) - var(--sh));}
   .content{padding:18px 20px;overflow-y:auto;}
@@ -282,7 +285,7 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
   </div>
 
   <div class="sidebar" id="sidebarDesktop">
-    <div id="sbDesktopContent"></div>
+    <div id="sbDesktopContent" style="display:flex;flex-direction:column;height:100%;overflow:hidden;"></div>
   </div>
 </div>
 
@@ -737,7 +740,7 @@ function cartHtml(){
       <h2>🧾 購物清單</h2>
       <p>${cust||'尚未輸入顧客姓名'}</p>
     </div>
-    <div class="order-list" style="flex:1;overflow-y:auto;">
+    <div class="order-list">
       ${items.length===0?'<div class="empty-cart"><div class="icon">🛒</div><p>尚未選擇商品</p></div>'
         :items.map(i=>`<div class=\"order-item${i.isDiscount?' discount-item':''}\"><span class=\"oi-emoji\">${i.emoji}</span><div class=\"oi-info\"><div class=\"oi-name\">${i.name}</div><div class=\"oi-sub\">${i.sub}</div></div><span class=\"oi-price\" style=\"${i.isDiscount?'color:var(--red);':''}\">${i.isDiscount?'-':''}NT$${Math.abs(i.price).toLocaleString()}</span></div>`).join('')}
     </div>
