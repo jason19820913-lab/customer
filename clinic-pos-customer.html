@@ -620,10 +620,41 @@ function filterDD(t){
   dd.classList.add('open');
   if(v!==ddState[t]){ddState[t]='';document.getElementById(t+'Select').value='';if(t==='doctor')onStaffChange();}
 }
+// 櫃檯/護理師/藥師 三者互斥（一張訂單只能有其中一類）
+const MUTEX_GROUP=['staff','nurse','pharma'];
+const MUTEX_LABEL={staff:'櫃檯',nurse:'護理師',pharma:'藥師'};
+
 function selPerson(t,n){
-  ddState[t]=n;document.getElementById(t+'Input').value=n;document.getElementById(t+'Select').value=n;
+  // 互斥檢查：選了 staff/nurse/pharma 中的一個，其他不能有值
+  if(MUTEX_GROUP.includes(t)){
+    const conflicts=MUTEX_GROUP.filter(other=>other!==t && document.getElementById(other+'Select').value);
+    if(conflicts.length){
+      const conflictLabels=conflicts.map(k=>MUTEX_LABEL[k]).join('、');
+      const thisLabel=MUTEX_LABEL[t];
+      // 跳出警示，詢問是否清除衝突欄位
+      if(confirm(`⚠️ 一張訂單只能有一類人員分潤
+
+「${thisLabel}」與「${conflictLabels}」不能同時填寫。
+
+按「確定」清除「${conflictLabels}」並選取「${thisLabel}: ${n}」`)){
+        conflicts.forEach(other=>{
+          ddState[other]='';
+          document.getElementById(other+'Input').value='';
+          document.getElementById(other+'Select').value='';
+        });
+      } else {
+        // 取消，關掉 dropdown 不做任何變更
+        document.getElementById(t+'Dd').classList.remove('open');
+        return;
+      }
+    }
+  }
+  ddState[t]=n;
+  document.getElementById(t+'Input').value=n;
+  document.getElementById(t+'Select').value=n;
   document.getElementById(t+'Dd').classList.remove('open');
-  if(t==='doctor')onStaffChange();renderSidebar();
+  if(t==='doctor')onStaffChange();
+  renderSidebar();
 }
 // 點擊下拉外部才關閉（捲動不關閉）
 document.addEventListener('mousedown',e=>{
