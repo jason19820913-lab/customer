@@ -1123,11 +1123,21 @@ function renderPatientResultRaw(rows, headers, label, source){
   const MONEY_COLS=['結帳金額',...COMM_COLS];
   const BADGE_COLS=['院區','付款方式'];
 
+  // 固定顯示欄（不管有沒有值都要顯示）
+  const FIXED_COLS=['日期','時間','院區','顧客姓名','身分證遮罩','病歷號','當班醫師','櫃檯人員','護理師','藥師','結帳金額','付款方式','醫師抽成','櫃檯抽成','護理師抽成','藥師抽成'];
+
+  // 商品欄：只保留在此顧客所有訂單中至少有一筆數量>0 的欄位
+  const productCols=headers.filter(h=>!FIXED_COLS.includes(h));
+  const usedProductCols=productCols.filter(h=>rows.some(r=>Number(r[h]||0)>0));
+
+  // 最終顯示欄：固定欄（只保留 headers 中有的）+ 有購買的商品欄
+  const displayHeaders=[...FIXED_COLS.filter(h=>headers.includes(h)), ...usedProductCols];
+
   // 使用全域 fmtDate / fmtTime
 
-  document.getElementById('patientThead').innerHTML=`<tr>${headers.map(h=>`<th style="white-space:nowrap;font-size:11px;">${h}</th>`).join('')}</tr>`;
+  document.getElementById('patientThead').innerHTML=`<tr>${displayHeaders.map(h=>`<th style="white-space:nowrap;font-size:11px;">${h}</th>`).join('')}</tr>`;
   document.getElementById('adminPatientBody').innerHTML=[...rows].reverse().map(r=>`<tr>${
-    headers.map(h=>{
+    displayHeaders.map(h=>{
       const raw=r[h]??'';
       // 日期/時間特別處理
       if(h==='日期') return `<td style="white-space:nowrap;font-size:12px;">${fmtDate(raw)||'—'}</td>`;
