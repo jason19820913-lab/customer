@@ -731,7 +731,22 @@ async function gasWrite(sheet,headers,rows){
   return r.json();
 }
 
-function getProducts(){try{const s=localStorage.getItem(PRODUCTS_KEY);return s?JSON.parse(s):[...DEFAULT_PRODUCTS];}catch(e){return[...DEFAULT_PRODUCTS];}}
+function getProducts(){
+  try{
+    const s=localStorage.getItem(PRODUCTS_KEY);
+    if(!s) return [...DEFAULT_PRODUCTS];
+    const all=JSON.parse(s);
+    const hasSheetData=all.some(p=>String(p.id||'').startsWith('custom_'));
+    if(!hasSheetData) return all;
+    const byName={};
+    all.forEach(p=>{
+      const key=(p.cat||'')+'|'+(p.name||'');
+      const isSheet=String(p.id||'').startsWith('custom_');
+      if(!byName[key]||isSheet) byName[key]=p;
+    });
+    return Object.values(byName);
+  }catch(e){return[...DEFAULT_PRODUCTS];}
+}
 function saveProducts(p, silent=false){
   localStorage.setItem(PRODUCTS_KEY, JSON.stringify(p));
   if(!gasUrl()) return;
