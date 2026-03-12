@@ -871,11 +871,14 @@ function calcOneRuleAdmin(rule, salePrice, qty, lineTotal){
 
 function findCommRulesAdmin(product){
   const rules=getAdminCommRules();
-  const priority=id=>id===product.id?0:id.startsWith('_cat_')?1:id.startsWith('_group_')?2:id==='_all_'?3:4;
+  const pCat=(product.cat||'').trim();
+  const pGrp=(product.group||'').trim();
+  const pId=(product.id||'').trim();
+  const priority=id=>id===pId?0:id.startsWith('_cat_')?1:id.startsWith('_group_')?2:id==='_all_'?3:4;
   const byRole={};
   rules.forEach(r=>{
-    const pid=r.productId||'';
-    if(pid===product.id||pid==='_cat_'+product.cat||pid==='_group_'+product.group||pid==='_all_'){
+    const pid=(r.productId||'').trim();
+    if(pid===pId||pid==='_cat_'+pCat||pid==='_group_'+pGrp||pid==='_all_'){
       const ex=byRole[r.role];
       if(!ex||priority(pid)<priority(ex.productId)) byRole[r.role]=r;
     }
