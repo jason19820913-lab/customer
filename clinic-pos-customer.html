@@ -834,7 +834,19 @@ function closeDrawer(){document.getElementById('cartDrawer').classList.remove('o
 // 分潤規則從後台/Google Sheet 設定，無硬碼預設
 
 function getCommRules(){
-  try{const s=localStorage.getItem(COMM_KEY);return s?JSON.parse(s):[];}catch(e){return[];}
+  try{
+    const s=localStorage.getItem(COMM_KEY);
+    if(!s) return [];
+    const raw=JSON.parse(s);
+    // 正規化：確保欄位名稱正確（Sheet 可能有大小寫或空格差異）
+    return raw.map(r=>{
+      // 新格式（productId/role/commType/commValue/commThreshold）直接用
+      if(r.role && r.commType) return r;
+      // 若有舊格式欄位（doctorType/doctorValue 等），轉成新格式展開多筆
+      // 這段保護措施讓舊資料不會造成 role=undefined
+      return r; // 其他不認識格式直接回傳，calcOneRule 有預設值保護
+    }).filter(r=>r.productId && r.role); // 過濾掉沒有 role 的無效規則
+  }catch(e){return[];}
 }
 
 // 計算單一規則的分潤金額（支援5種計算方式）
