@@ -421,12 +421,17 @@ document.addEventListener('DOMContentLoaded', async ()=>{
 
       // 商品主檔：每列一筆商品
       if(pd.status==='ok' && pd.rows && pd.rows.length){
-        const products=pd.rows.map(r=>({
-          ...r,
-          price:Number(r.price)||0,
-          active:String(r.active).toUpperCase()!=='FALSE',
-          catDescription:r.catDescription||''
-        }));
+        const products=pd.rows.map(r=>{
+          // trim 所有字串欄位，避免 Sheet 空格造成比對失敗
+          const trimmed={};
+          Object.keys(r).forEach(k=>{ trimmed[k]=typeof r[k]==='string'?r[k].trim():r[k]; });
+          return {
+            ...trimmed,
+            price:Number(trimmed.price)||0,
+            active:String(trimmed.active).toUpperCase()!=='FALSE',
+            catDescription:trimmed.catDescription||''
+          };
+        });
         localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
         console.info('[products] 已同步商品，共', products.length, '項');
       }
@@ -454,7 +459,10 @@ document.addEventListener('DOMContentLoaded', async ()=>{
 
       // 分潤規則
       if(commD.status==='ok' && commD.rows && commD.rows.length){
-        localStorage.setItem(COMM_KEY, JSON.stringify(commD.rows));
+        const commRows=commD.rows.map(r=>{
+          const t={};Object.keys(r).forEach(k=>{t[k]=typeof r[k]==='string'?r[k].trim():r[k];});return t;
+        });
+        localStorage.setItem(COMM_KEY, JSON.stringify(commRows));
         console.info('[comm] 已同步分潤規則，共', commD.rows.length, '筆');
       }
 
