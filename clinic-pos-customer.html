@@ -348,7 +348,25 @@ const DEFAULT_PRODUCTS=[
 const BUNDLE={protein:{unit:90,bundle:540},mct:{unit:100,bundle:600}};
 const CAT_EMOJI={'蛋白代餐':'🥛','Q飽纖燃飲':'💧','看診套組':'🎁','盒裝膠囊':'💊','其他營養':'🌿'};
 
-function getProducts(){try{const s=localStorage.getItem(PRODUCTS_KEY);return s?JSON.parse(s):DEFAULT_PRODUCTS;}catch(e){return DEFAULT_PRODUCTS;}}
+function getProducts(){
+  try{
+    const s=localStorage.getItem(PRODUCTS_KEY);
+    if(!s) return DEFAULT_PRODUCTS;
+    const all=JSON.parse(s);
+    // 有 Sheet 資料時（id 含 custom_），去除同名的舊預設值（id 為短碼如 p1/m1）
+    const hasSheetData=all.some(p=>String(p.id||'').startsWith('custom_'));
+    if(!hasSheetData) return all;
+    // 去重：同名商品保留 Sheet 版本（id 以 custom_ 開頭）
+    const byName={};
+    all.forEach(p=>{
+      const key=(p.cat||'')+'|'+(p.name||'');
+      const existing=byName[key];
+      const isSheet=String(p.id||'').startsWith('custom_');
+      if(!existing || isSheet) byName[key]=p;
+    });
+    return Object.values(byName);
+  }catch(e){return DEFAULT_PRODUCTS;}
+}
 const DEFAULT_CLINICS=['鶯歌院區','三樹院區','樹林院區','桃園院區','土城院區','八德院區','龍潭院區','大溪院區','大竹院區','大浦院區','平鎮院區','埔心院區'];
 function getClinics(){try{const s=localStorage.getItem(CLINIC_KEY);return s?JSON.parse(s):DEFAULT_CLINICS;}catch(e){return DEFAULT_CLINICS;}}
 function getPromos(){
