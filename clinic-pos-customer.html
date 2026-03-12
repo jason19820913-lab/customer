@@ -876,10 +876,14 @@ function calcOneRule(rule, salePrice, qty, lineTotal){
 function findCommRulesForProduct(product){
   const rules = getCommRules();
   const matched = [];
+  // runtime trim 防止 Sheet 空格造成比對失敗
+  const pCat  = (product.cat   ||'').trim();
+  const pGrp  = (product.group ||'').trim();
+  const pId   = (product.id    ||'').trim();
   rules.forEach(r=>{
-    const pid = r.productId||'';
-    if(pid===product.id || pid==='_cat_'+product.cat ||
-       pid==='_group_'+product.group || pid==='_all_'){
+    const pid = (r.productId||'').trim();
+    if(pid===pId || pid==='_cat_'+pCat ||
+       pid==='_group_'+pGrp || pid==='_all_'){
       matched.push(r);
     }
   });
@@ -908,8 +912,8 @@ function calcComm(itemsStr, hasDoctor, hasStaff, hasNurse, hasPharma){
     const m=part.match(/^(.+?)×(\d+)/);
     if(!m){console.warn('  無法解析：',part);return;}
     const rawName=m[1].trim(), qty=parseInt(m[2])||1;
-    const shortName=rawName.includes('-')?rawName.split('-').slice(1).join('-'):rawName;
-    const product=products.find(p=>p.name===shortName||p.name===rawName);
+    const shortName=(rawName.includes('-')?rawName.split('-').slice(1).join('-'):rawName).trim();
+    const product=products.find(p=>p.name.trim()===shortName||p.name.trim()===rawName.trim());
     if(!product){console.warn('  ❌ 找不到商品：rawName='+rawName+' shortName='+shortName);return;}
 
     const price=product.price||0;
