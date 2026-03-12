@@ -894,26 +894,34 @@ function calcComm(itemsStr, hasDoctor, hasStaff, hasNurse, hasPharma){
   // 角色 key → 是否填報
   const filled={doctor:hasDoctor, staff:hasStaff, nurse:hasNurse, pharma:hasPharma};
 
+  console.group('[calcComm] 開始計算：'+itemsStr);
+  console.log('filled roles:', JSON.stringify(filled));
   itemsStr.split('、').forEach(part=>{
-    const m=part.match(/^(.+?)×(\d+)/);if(!m)return;
+    const m=part.match(/^(.+?)×(\d+)/);
+    if(!m){console.warn('  無法解析：',part);return;}
     const rawName=m[1].trim(), qty=parseInt(m[2])||1;
     const shortName=rawName.includes('-')?rawName.split('-').slice(1).join('-'):rawName;
     const product=products.find(p=>p.name===shortName||p.name===rawName);
-    if(!product) return;
+    if(!product){console.warn('  ❌ 找不到商品：rawName='+rawName+' shortName='+shortName);return;}
 
     const price=product.price||0;
     const lineTotal=price*qty;
     const matchedRules=findCommRulesForProduct(product);
+    console.log('  商品:'+product.name+' cat:'+product.cat+' qty:'+qty+' 適用規則數:'+matchedRules.length);
+    if(!matchedRules.length) console.warn('  ⚠️ 無適用規則');
 
     matchedRules.forEach(rule=>{
-      if(!filled[rule.role]) return;  // 該角色沒填報，跳過
+      if(!filled[rule.role]){console.log('    跳過 role:'+rule.role+' (未填報)');return;}
       const amt=calcOneRule(rule, price, qty, lineTotal);
+      console.log('    ✅ role:'+rule.role+' type:'+rule.commType+' val:'+rule.commValue+' qty:'+qty+' → NT$'+amt);
       if(rule.role==='doctor') dr+=amt;
       else if(rule.role==='staff')  st+=amt;
       else if(rule.role==='nurse')  nu+=amt;
       else if(rule.role==='pharma') ph+=amt;
     });
   });
+  console.log('[calcComm] 結果 dr:'+dr+' st:'+st+' nu:'+nu+' ph:'+ph);
+  console.groupEnd();
   return {dr,st,nu,ph};
 }
 
