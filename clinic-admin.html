@@ -787,10 +787,11 @@ async function initApp(){
 
     // 商品主檔
     if(prodD.status==='ok' && prodD.rows?.length){
-      const products = prodD.rows.map(r=>({
-        ...r, price:Number(r.price)||0,
-        active: String(r.active).toUpperCase()!=='FALSE'
-      }));
+      const products = prodD.rows.map(r=>{
+        const trimmed={};
+        Object.keys(r).forEach(k=>{ trimmed[k]=typeof r[k]==='string'?r[k].trim():r[k]; });
+        return { ...trimmed, price:Number(trimmed.price)||0, active:String(trimmed.active).toUpperCase()!=='FALSE' };
+      });
       localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
       renderProductManager();
     }
