@@ -422,7 +422,8 @@ tbody tr:hover td{background:var(--sage-pale);}
       <div style="font-size:11px;color:#888;margin-bottom:12px;">
         💡 <strong>商品層級優先</strong>，沒設定的商品會往上找「分類預設（_cat_分類名）」或「群組預設（_group_protein）」
       </div>
-      <div id="commList"><div style="text-align:center;padding:30px;color:#aaa;">載入中...</div></div>
+      <div id="commDiag" style="display:none;background:#FFF3E0;border:1px solid #FFB74D;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:11px;line-height:1.7;"></div>
+    <div id="commList"><div style="text-align:center;padding:30px;color:#aaa;">載入中...</div></div>
     </div>
 
     <div class="sc" style="background:#EFF7F0;border:1px solid #C5DEC8;">
@@ -1674,6 +1675,13 @@ const COMM_ROLE_KEYS=[
 
 let editCommRules=[];
 
+function showRawCommRules(){
+  const rawS=localStorage.getItem(COMM_KEY);
+  const raw=rawS?JSON.parse(rawS):[];
+  const lines=raw.map((r,i)=>`[${i}] productId=${r.productId||'???'} role=${r.role||'???'} commType=${r.commType||'???'} commValue=${r.commValue??'???'}`);
+  alert('分潤規則原始資料（共'+raw.length+'筆）：\n\n'+lines.join('\n'));
+}
+
 function loadCommData(){
   try{const s=localStorage.getItem(COMM_KEY);editCommRules=s?JSON.parse(s):[];}catch(e){editCommRules=[];}
 }
@@ -1694,6 +1702,23 @@ function renderCommPage(){
   loadCommData();
   const el=document.getElementById('commList');
   if(!el)return;
+
+  // 診斷：顯示 localStorage 原始規則狀況
+  const rawS=localStorage.getItem(COMM_KEY);
+  const rawAll=rawS?JSON.parse(rawS):[];
+  const invalidRules=rawAll.filter(r=>!r.role||!r.productId);
+  const diagEl=document.getElementById('commDiag');
+  if(diagEl){
+    if(invalidRules.length>0){
+      diagEl.style.display='block';
+      diagEl.innerHTML=`<span style="color:#c62828;">⚠️ 偵測到 ${invalidRules.length} 條格式不符的規則（缺少 role 或 productId），這些規則已自動跳過。</span>
+        <br><span style="font-size:10px;color:#888;">請在後台重新設定這些規則，或按下「重新從 Sheet 同步」後再手動新增。</span>
+        <button style="margin-left:8px;font-size:10px;padding:2px 8px;cursor:pointer;" onclick="showRawCommRules()">查看原始資料</button>`;
+    } else {
+      diagEl.style.display='none';
+    }
+  }
+
   if(!editCommRules.length){
     el.innerHTML=`<div style="text-align:center;padding:30px;color:#aaa;"><div style="font-size:32px;margin-bottom:8px;">💰</div><p>尚無分潤規則</p><button class="btn btn-outline" style="margin-top:10px;" onclick="initDefaultComm()">載入預設規則</button></div>`;
     return;
@@ -1820,11 +1845,11 @@ function openCommModal(idx){
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div class="form-group">
             <label style="font-size:11px;font-weight:700;" id="cm_val_label">抽成金額 / 比率</label>
-            <input class="fg-input" type="number" id="cm_commValue" value="${r.commValue||0}" min="0" placeholder="0">
+            <input class="fg-input" type="number" id="cm_commValue" value="${r.commValue||0}" min="0" placeholder="0" oninput="updateCommHint()">
           </div>
           <div class="form-group" id="cm_thres_group" style="display:${(r.commType==='threshold'||r.commType==='salesStage'||r.commType==='salesAmount')?'block':'none'}">
             <label style="font-size:11px;font-weight:700;" id="cm_thres_label">門檻金額 NT$</label>
-            <input class="fg-input" type="number" id="cm_commThreshold" value="${r.commThreshold||0}" min="0" placeholder="銷售金額門檻">
+            <input class="fg-input" type="number" id="cm_commThreshold" value="${r.commThreshold||0}" min="0" placeholder="銷售金額門檻" oninput="updateCommHint()">
           </div>
         </div>
         <div style="background:#FFF8E1;border-radius:8px;padding:8px 12px;font-size:11px;color:#7B6200;" id="cm_type_hint"></div>
@@ -1884,16 +1909,28 @@ function commTypeChanged(){
     salesStage:'累計銷售金額門檻',
     salesAmount:'每多少銷售金額（NT$）',
   };
-  const hints={
-    fixed:'每賣出一件商品，固定抽 NT$X',
-    percent:'每件依售價計算，售價 × X% = 抽成',
-    threshold:'單筆此商品銷售金額達門檻，給一次性獎金',
-    salesStage:'累計銷售金額達門檻，給一次性獎金（下次結帳重新計算）',
-    salesAmount:'銷售金額每達 NT$門檻，給 NT$抽成。例：每 NT$1000 給 NT$50',
-  };
   if(valLabel) valLabel.textContent=labels[type]||'抽成值';
   if(thresLabel) thresLabel.textContent=thresLabels[type]||'門檻金額 NT$';
-  if(hint) hint.textContent=hints[type]||'';
+  updateCommHint();
+}
+
+function updateCommHint(){
+  const hint=document.getElementById('cm_type_hint');
+  if(!hint) return;
+  const type=document.getElementById('cm_commType')?.value||'fixed';
+  const val=Number(document.getElementById('cm_commValue')?.value)||0;
+  const thres=Number(document.getElementById('cm_commThreshold')?.value)||0;
+  const X=val>0?`NT$${val.toLocaleString()}`:'NT$X';
+  const T=thres>0?`NT$${thres.toLocaleString()}`:'NT$門檻';
+  const examples={
+    fixed:`每賣出 1 件 → 抽 ${X}；賣出 10 件 → 抽 ${val>0?'NT$'+(val*10).toLocaleString():'NT$X×10'}`,
+    percent:`每件依售價計算，售價 × ${val||'X'}% = 抽成
+例：售價 NT$1,100 × ${val||'X'}% = NT$${val>0?Math.round(1100*val/100).toLocaleString():'?'}`,
+    threshold:`單筆此商品銷售金額 ≥ ${T}，給一次性獎金 ${X}`,
+    salesStage:`累計銷售金額 ≥ ${T}，給一次性獎金 ${X}（下次結帳重新計算）`,
+    salesAmount:`銷售金額每達 ${T} 給 ${X}。例：賣 NT$${thres>0?(thres*3).toLocaleString():'?'} → 抽 ${val>0?'NT$'+(val*3).toLocaleString():'NT$X×3'}`,
+  };
+  hint.innerHTML=`<span style="font-size:12px;line-height:1.8;">${(examples[type]||'').replace(/\n/g,'<br>')}</span>`;
 }
 function closeCommModal(){document.getElementById('commModalOverlay').classList.remove('open');}
 
