@@ -832,7 +832,7 @@ function cartHtml(){
         <input type="number" class="input-cash" id="cashInput" placeholder="0" value="${cashVal}" oninput="calcChange(this)">
         <div class="change-display" id="changeLine"></div>
       </div>
-      <button class="checkout-btn" onclick="checkout()" ${ok?'':'disabled'}>確認結帳</button>
+      <button class="checkout-btn" onclick="openPinModal()" ${ok?'':'disabled'}>確認結帳</button>
     </div>`;
 }
 
