@@ -167,6 +167,8 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
 /* MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:14px;}
 .modal-overlay.open{display:flex;}
+.mutex-role-btn{flex:1;padding:7px 0;border:1.5px solid #D0DEAD;background:#fff;border-radius:10px;font-family:inherit;font-size:12px;font-weight:600;color:var(--brown);cursor:pointer;transition:all .15s;}
+.mutex-role-btn.active{background:var(--sage);border-color:var(--sage);color:#fff;}
 .modal{background:#fff;border-radius:18px;padding:22px 20px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.25);animation:mIn .3s ease;}
 @keyframes mIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
 .modal-icon{font-size:38px;text-align:center;margin-bottom:10px;}
@@ -280,7 +282,7 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
 
 <!-- 密碼 + 員工選擇 Modal -->
 <div class="modal-overlay" id="pinModal">
-  <div class="modal" style="max-width:420px;">
+  <div class="modal" style="max-width:560px;">
     <div class="modal-icon" id="pinModalIcon">🔐</div>
     <h2 id="pinModalTitle">員工驗證</h2>
     <p id="pinModalMsg" style="color:#888;font-size:12px;margin-bottom:12px;">請輸入員工密碼以繼續</p>
@@ -296,41 +298,48 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
 
     <!-- 步驟B：員工選擇 -->
     <div id="staffStep" style="display:none;">
-      <p style="font-size:11px;color:#888;margin-bottom:14px;">請選擇當班人員（可選填）</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+      <!-- 醫師（非必填，獨立） -->
+      <div style="margin-bottom:14px;">
         <div class="form-group">
-          <label>當班醫師</label>
+          <label style="font-size:12px;color:var(--brown);">👨‍⚕️ 當班醫師 <span style="color:#aaa;font-weight:400;">(選填)</span></label>
           <div style="position:relative;">
             <input class="fg-input" type="text" id="staffDoctor" placeholder="搜尋醫師..." autocomplete="off"
               oninput="filterModalDD('doctor')" onfocus="showModalDD('doctor')">
-            <div class="search-dd" id="modalDoctorDd" style="width:100%;"></div>
+            <div class="search-dd" id="modalDoctorDd" style="min-width:180px;max-width:280px;"></div>
             <input type="hidden" id="staffDoctorVal">
           </div>
         </div>
-        <div class="form-group">
-          <label>櫃檯人員</label>
+      </div>
+      <!-- 互斥三選一：櫃檯 / 護理師 / 藥師 -->
+      <div style="margin-bottom:6px;font-size:12px;color:var(--brown);font-weight:700;">負責人員 <span style="color:#aaa;font-weight:400;font-size:11px;">(三擇一，選填)</span></div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <button id="mutexBtnStaff" class="mutex-role-btn active" onclick="selectMutexRole('staff')">💁 櫃檯</button>
+        <button id="mutexBtnNurse" class="mutex-role-btn" onclick="selectMutexRole('nurse')">👩‍⚕️ 護理師</button>
+        <button id="mutexBtnPharma" class="mutex-role-btn" onclick="selectMutexRole('pharma')">💊 藥師</button>
+      </div>
+      <div id="mutexInputArea" style="margin-bottom:14px;">
+        <!-- 動態顯示對應角色的搜尋欄 -->
+        <div id="mutexStaffDiv" class="form-group">
           <div style="position:relative;">
-            <input class="fg-input" type="text" id="staffStaff" placeholder="搜尋人員..." autocomplete="off"
+            <input class="fg-input" type="text" id="staffStaff" placeholder="搜尋櫃檯人員..." autocomplete="off"
               oninput="filterModalDD('staff')" onfocus="showModalDD('staff')">
-            <div class="search-dd" id="modalStaffDd" style="width:100%;"></div>
+            <div class="search-dd" id="modalStaffDd" style="min-width:180px;max-width:280px;"></div>
             <input type="hidden" id="staffStaffVal">
           </div>
         </div>
-        <div class="form-group">
-          <label>護理師</label>
+        <div id="mutexNurseDiv" class="form-group" style="display:none;">
           <div style="position:relative;">
             <input class="fg-input" type="text" id="staffNurse" placeholder="搜尋護理師..." autocomplete="off"
               oninput="filterModalDD('nurse')" onfocus="showModalDD('nurse')">
-            <div class="search-dd" id="modalNurseDd" style="width:100%;"></div>
+            <div class="search-dd" id="modalNurseDd" style="min-width:180px;max-width:280px;"></div>
             <input type="hidden" id="staffNurseVal">
           </div>
         </div>
-        <div class="form-group">
-          <label>藥師</label>
+        <div id="mutexPharmaDiv" class="form-group" style="display:none;">
           <div style="position:relative;">
             <input class="fg-input" type="text" id="staffPharma" placeholder="搜尋藥師..." autocomplete="off"
               oninput="filterModalDD('pharma')" onfocus="showModalDD('pharma')">
-            <div class="search-dd" id="modalPharmaDd" style="width:100%;"></div>
+            <div class="search-dd" id="modalPharmaDd" style="min-width:180px;max-width:280px;"></div>
             <input type="hidden" id="staffPharmaVal">
           </div>
         </div>
@@ -1056,6 +1065,28 @@ function verifyPin(){
 }
 
 // Modal 內員工 dropdown
+let activeMutexRole='staff';
+function selectMutexRole(role){
+  activeMutexRole=role;
+  // 清除其他兩個角色的值
+  const others={staff:['nurse','pharma'],nurse:['staff','pharma'],pharma:['staff','nurse']}[role]||[];
+  others.forEach(r=>{
+    const R=r.charAt(0).toUpperCase()+r.slice(1);
+    const inp=document.getElementById('staff'+R);const val=document.getElementById('staff'+R+'Val');
+    if(inp)inp.value='';if(val)val.value='';
+  });
+  // 切換按鈕 active
+  ['Staff','Nurse','Pharma'].forEach(R=>{
+    const btn=document.getElementById('mutexBtn'+R);
+    if(btn) btn.classList.toggle('active',R.toLowerCase()===role);
+  });
+  // 顯示/隱藏輸入欄
+  ['Staff','Nurse','Pharma'].forEach(R=>{
+    const div=document.getElementById('mutex'+R+'Div');
+    if(div) div.style.display=R.toLowerCase()===role?'':'none';
+  });
+}
+
 function renderModalDDs(){
   const staffData=getStaff();
   const map={Doctor:staffData.doctors||[],Staff:staffData.staff||[],Nurse:staffData.nurses||[],Pharma:staffData.pharmas||[]};
