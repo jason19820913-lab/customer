@@ -693,30 +693,8 @@ const SALES_KEY='clinicSalesLog',GS_KEY='gsUrl',PIN_KEY='adminPin',STAFF_KEY='cl
 const DEFAULT_PIN='1234';
 
 // ── DEFAULT PRODUCTS ──
-const DEFAULT_PRODUCTS=[
-  {cat:'蛋白代餐',id:'p1',emoji:'🍫',name:'巧克力',price:90,group:'protein',active:true},
-  {cat:'蛋白代餐',id:'p2',emoji:'☕',name:'觀音拿鐵',price:90,group:'protein',active:true},
-  {cat:'蛋白代餐',id:'p3',emoji:'🌿',name:'芒果百香',price:90,group:'protein',active:true},
-  {cat:'蛋白代餐',id:'p4',emoji:'🥛',name:'無添加原味',price:90,group:'protein',active:true},
-  {cat:'蛋白代餐',id:'p5',emoji:'🍎',name:'草莓蘋果',price:90,group:'protein',active:true},
-  {cat:'蛋白代餐',id:'p6',emoji:'🍵',name:'抹茶拿鐵',price:90,group:'protein',active:true},
-  {cat:'蛋白代餐',id:'p7',emoji:'🌾',name:'杏仁燕麥',price:90,group:'protein',active:true},
-  {cat:'蛋白代餐',id:'p8',emoji:'🖤',name:'黑芝麻',price:90,group:'protein',active:true},
-  {cat:'Q飽纖燃飲',id:'m1',emoji:'🍋',name:'檸果拿鐵',price:100,group:'mct',active:true},
-  {cat:'Q飽纖燃飲',id:'m2',emoji:'🫐',name:'莓果優格',price:100,group:'mct',active:true},
-  {cat:'Q飽纖燃飲',id:'m3',emoji:'🥭',name:'百香芒果',price:100,group:'mct',active:true},
-  {cat:'Q飽纖燃飲',id:'m4',emoji:'🌸',name:'荔枝玫瑰',price:100,group:'mct',active:true},
-  {cat:'看診套組',id:'pk1',emoji:'📦',name:'中碳套組',price:1000,group:'package',detail:'14包蛋白代餐｜一天兩次',badge:'熱銷',active:true},
-  {cat:'看診套組',id:'pk2',emoji:'📦',name:'低碳套組',price:1500,group:'package',detail:'21包蛋白代餐｜一天三次',badge:'推薦',active:true},
-  {cat:'盒裝膠囊',id:'c1',emoji:'💊',name:'好燃對策',price:960,group:'capsule',active:true},
-  {cat:'盒裝膠囊',id:'c2',emoji:'💊',name:'碳水對策',price:800,group:'capsule',active:true},
-  {cat:'盒裝膠囊',id:'c3',emoji:'💊',name:'甘好腸寶',price:1260,group:'capsule',active:true},
-  {cat:'盒裝膠囊',id:'c4',emoji:'💊',name:'好輕鬆',price:600,group:'capsule',active:true},
-  {cat:'盒裝膠囊',id:'c5',emoji:'💊',name:'好元氣',price:350,group:'capsule',active:true},
-  {cat:'其他營養',id:'o1',emoji:'🥚',name:'拿鐵蛋白棒',price:400,group:'other',active:true},
-  {cat:'其他營養',id:'o2',emoji:'🌿',name:'健健粉',price:420,group:'other',active:true},
-  {cat:'其他營養',id:'o3',emoji:'🔵',name:'複方蛋白粉',price:1100,group:'other',active:true},
-];
+// 預設商品已移除，全部由 Google Sheet 商品主檔同步
+const DEFAULT_PRODUCTS=[];
 
 
 /* ── GAS 通用 API 輔助函數 ── */
@@ -872,7 +850,7 @@ function filterClinic(c,btn){activeCF=c;document.querySelectorAll('.clinic-filte
 
 const COMM_RULES={'複方蛋白粉':{dr:100,st:20,ph:0},'蛋白代餐':{dr:100,st:10,ph:0},'Q飽纖燃飲':{dr:100,st:10,ph:0},'健健糖':{dr:50,st:10,ph:0},'蛋白棒':{dr:50,st:10,ph:0},'防蚊液':{dr:0,st:0,ph:30},'金鶯涼喉':{dr:0,st:0,ph:10},'好燃對策':{dr:0,st:0,ph:100},'碳水對策':{dr:0,st:0,ph:100},'好輕鬆':{dr:0,st:0,ph:50},'好元氣':{dr:0,st:0,ph:50},'甘好睡寶':{dr:0,st:0,ph:100},'中碳套組':{dr:100,st:10,ph:0},'低碳套組':{dr:100,st:10,ph:0},'拿鐵蛋白棒':{dr:50,st:10,ph:0},'健健粉':{dr:50,st:10,ph:0}};
 // ── 後台分潤計算（與前台邏輯一致）──
-function getAdminProducts(){ try{const s=localStorage.getItem(PRODUCTS_KEY);return s?JSON.parse(s):[];}catch(e){return[];} }
+function getAdminProducts(){try{const s=localStorage.getItem(PRODUCTS_KEY);return s?JSON.parse(s):[];}catch(e){return[];}}
 function getAdminCommRules(){ try{const s=localStorage.getItem(COMM_KEY);return s?JSON.parse(s):[];}catch(e){return[];} }
 
 function calcOneRuleAdmin(rule, salePrice, qty, lineTotal){
@@ -1166,7 +1144,7 @@ function renderPatientResultRaw(rows, headers, label, source){
       if(MONEY_COLS.includes(h) && Number(v)>0)
         return `<td style="white-space:nowrap;text-align:right;"><strong style="color:${['結帳金額'].includes(h)?'var(--sage)':'#888'};">NT$${Number(v).toLocaleString()}</strong></td>`;
       if(BADGE_COLS.includes(h) && v)
-        return `<td><span style="font-size:10px;background:var(--sage-pale);color:var(--sage);padding:2px 7px;border-radius:9px;font-weight:600;">${v}</span></td>`;
+        return `<td style="white-space:nowrap;"><span style="font-size:10px;background:var(--sage-pale);color:var(--sage);padding:2px 7px;border-radius:9px;font-weight:600;white-space:nowrap;">${v}</span></td>`;
       if(!isNaN(Number(v)) && Number(v)>0 && !['病歷號'].includes(h))
         return `<td style="text-align:center;"><strong style="color:var(--sage);">${v}</strong></td>`;
       if(v===''||v==='0')
