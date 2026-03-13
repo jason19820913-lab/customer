@@ -946,7 +946,7 @@ function renderStats(){
   });
 
   document.getElementById('statsHead').innerHTML=`<tr>
-    <th>時間</th><th>院區</th><th>顧客</th><th>醫師</th><th>櫃檯</th><th>護理師</th>
+    <th>時間</th><th style="white-space:nowrap;">院區</th><th>顧客</th><th style="white-space:nowrap;">病歷號</th><th>醫師</th><th>櫃檯</th><th>護理師</th>
     ${statKeys.map(k=>`<th style="font-size:10px;white-space:nowrap;">${k}</th>`).join('')}
     <th>金額</th><th>付款</th>
     <th style="color:#7B6200;white-space:nowrap;">醫師抽成</th>
@@ -959,13 +959,14 @@ function renderStats(){
   function commCell(v){return v?`<td style="white-space:nowrap;text-align:right;color:var(--brown);">NT$${v.toLocaleString()}</td>`:`<td style="text-align:center;color:#ddd;">—</td>`;}
 
   const tbody=document.getElementById('logBody');
-  if(!log.length){tbody.innerHTML=`<tr class="empty-row"><td colspan="${13+statKeys.length}">尚無銷售紀錄</td></tr>`;return;}
+  if(!log.length){tbody.innerHTML=`<tr class="empty-row"><td colspan="${14+statKeys.length}">尚無銷售紀錄</td></tr>`;return;}
   tbody.innerHTML=[...log].reverse().map(e=>{
     const cm=getEntryComm(e);
     return`<tr>
       <td style="white-space:nowrap;">${fmtTime(e.time)||''}</td>
       <td><span style="font-size:10px;background:var(--sage-pale);color:var(--sage);padding:2px 7px;border-radius:9px;font-weight:600;white-space:nowrap;">${e.clinic||'-'}</span></td>
-      <td><strong>${e.customer||''}</strong>${e.phone?`<br><span style="color:#aaa;font-size:9px;">病歷號：${e.phone}</span>`:''}</td>
+      <td><strong>${e.customer||''}</strong></td>
+      <td style="white-space:nowrap;color:#888;font-size:11px;">${e.phone||'—'}</td>
       <td style="white-space:nowrap;">${e.doctor||'-'}</td>
       <td style="white-space:nowrap;">${e.staff||'-'}</td>
       <td style="white-space:nowrap;">${e.nurse||'-'}</td>
@@ -1088,7 +1089,7 @@ async function renderPatientResult(records, label, mode, source){
     const m=parseItems(e.items||'');
     return`<tr>
       <td style="white-space:nowrap;">${fmtDate(e.date)||''}</td>
-      <td><span style="font-size:10px;background:var(--sage-pale);color:var(--sage);padding:2px 7px;border-radius:9px;font-weight:600;">${e.clinic||'-'}</span></td>
+      <td style="white-space:nowrap;"><span style="font-size:10px;background:var(--sage-pale);color:var(--sage);padding:2px 7px;border-radius:9px;font-weight:600;white-space:nowrap;">${e.clinic||'-'}</span></td>
       <td style="white-space:nowrap;">${e.doctor||''}</td>
       ${seenP.map(p=>m[p]?`<td style="text-align:center;"><strong style="color:var(--sage);">${m[p]}</strong></td>`:`<td style="text-align:center;color:#ddd;">—</td>`).join('')}
       <td style="white-space:nowrap;"><strong style="color:var(--sage);">NT$${(Number(e.total)||0).toLocaleString()}</strong></td>
