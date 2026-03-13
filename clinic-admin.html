@@ -1002,29 +1002,44 @@ function renderStats(){
   renderClinicFilterBtns();
   const allLog=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
   // 日期過濾
-  const today=new Date(); today.setHours(0,0,0,0);
+  // 台灣時區 (UTC+8) 的今日日期
+  function twToday(){
+    const now=new Date();
+    const tw=new Date(now.getTime()+8*60*60*1000);
+    return new Date(tw.getUTCFullYear(), tw.getUTCMonth(), tw.getUTCDate());
+  }
+  const today=twToday();
+
   function parseEntryDate(e){
     const raw=(e.date||'').trim();
     if(!raw) return null;
-    // 直接抓年月日數字，相容所有格式：2026/3/13、2026-03-13、2026年3月13日 等
+    // 支援各種格式：2026/3/13、2026-03-13、2026年3月13日
     const m=raw.match(/(\d{4})[^\d]+(\d{1,2})[^\d]+(\d{1,2})/);
     if(m) return new Date(parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3]));
-    // ISO timestamp fallback
+    // ISO timestamp：轉成台灣日期
     const d=new Date(raw);
-    return isNaN(d)?null:d;
+    if(isNaN(d)) return null;
+    const tw=new Date(d.getTime()+8*60*60*1000);
+    return new Date(tw.getUTCFullYear(), tw.getUTCMonth(), tw.getUTCDate());
   }
   function inDateRange(e){
     const d=parseEntryDate(e);
     if(!d) return true;
-    d.setHours(0,0,0,0);
-    if(activeDateMode==='today') return d.getTime()===today.getTime();
-    if(activeDateMode==='yesterday'){const y=new Date(today);y.setDate(y.getDate()-1);return d.getTime()===y.getTime();}
-    if(activeDateMode==='week'){const w=new Date(today);w.setDate(w.getDate()-w.getDay());return d>=w&&d<=today;}
+    const dTime=d.getTime();
+    if(activeDateMode==='today') return dTime===today.getTime();
+    if(activeDateMode==='yesterday'){const y=new Date(today);y.setDate(y.getDate()-1);return dTime===y.getTime();}
+    if(activeDateMode==='week'){
+      const w=new Date(today);
+      // 週一為一週起始
+      const day=w.getDay()||7;
+      w.setDate(w.getDate()-day+1);
+      return d>=w&&d<=today;
+    }
     if(activeDateMode==='month') return d.getFullYear()===today.getFullYear()&&d.getMonth()===today.getMonth();
     if(activeDateMode==='all') return true;
     if(activeDateMode==='custom'){
       if(activeDateFrom&&d<new Date(activeDateFrom)) return false;
-      if(activeDateTo&&d>new Date(activeDateTo)) return false;
+      if(activeDateTo){const to=new Date(activeDateTo);to.setDate(to.getDate()+1);if(d>=to)return false;}
       return true;
     }
     return true;
