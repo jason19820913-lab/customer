@@ -884,37 +884,65 @@ function calcComm(itemsStr, hasDoctor, hasStaff, hasNurse, hasPharma){
   let dr=0,st=0,nu=0,ph=0;
   if(!itemsStr) return {dr,st,nu,ph};
 
-  // 角色 key → 是否填報
   const filled={doctor:hasDoctor, staff:hasStaff, nurse:hasNurse, pharma:hasPharma};
 
-  console.group('[calcComm] 開始計算：'+itemsStr);
-  console.log('filled roles:', JSON.stringify(filled));
+  // ── Step1：解析每筆商品，建立 {product, qty, price} 清單 ──
+  const lines=[];
   itemsStr.split('、').forEach(part=>{
     const m=part.match(/^(.+?)×(\d+)/);
-    if(!m){console.warn('  無法解析：',part);return;}
+    if(!m) return;
     const rawName=m[1].trim(), qty=parseInt(m[2])||1;
     const shortName=(rawName.includes('-')?rawName.split('-').slice(1).join('-'):rawName).trim();
-    const product=products.find(p=>p.name.trim()===shortName||p.name.trim()===rawName.trim());
-    if(!product){console.warn('  ❌ 找不到商品：rawName='+rawName+' shortName='+shortName);return;}
+    const catPart=rawName.includes('-')?rawName.split('-')[0].trim():'';
+    const product=products.find(p=>{
+      const pName=(p.name||'').trim(), pCat=(p.cat||'').trim();
+      return catPart && pCat===catPart && pName===shortName;
+    }) || products.find(p=>(p.name||'').trim()===shortName)
+      || products.find(p=>(p.name||'').trim()===rawName.trim());
+    if(!product) return;
+    lines.push({product, qty, price:product.price||0});
+  });
 
-    const price=product.price||0;
-    const lineTotal=price*qty;
+  // ── Step2：對 salesAmount/threshold/salesStage 規則，
+  //    需要用「同分類/同群組/全品項」的總金額來計算，不能逐件算 ──
+
+  // 先收集每條規則對應的總 lineTotal（按規則 scope 加總）
+  // key: productId|role → {rule, totalAmt}
+  const ruleAgg={};
+
+  lines.forEach(({product, qty, price})=>{
     const matchedRules=findCommRulesForProduct(product);
-    console.log('  商品:'+product.name+' cat:'+product.cat+' qty:'+qty+' 適用規則數:'+matchedRules.length);
-    if(!matchedRules.length) console.warn('  ⚠️ 無適用規則');
-
     matchedRules.forEach(rule=>{
-      if(!filled[rule.role]){console.log('    跳過 role:'+rule.role+' (未填報)');return;}
-      const amt=calcOneRule(rule, price, qty, lineTotal);
-      console.log('    ✅ role:'+rule.role+' type:'+rule.commType+' val:'+rule.commValue+' qty:'+qty+' → NT$'+amt);
-      if(rule.role==='doctor') dr+=amt;
-      else if(rule.role==='staff')  st+=amt;
-      else if(rule.role==='nurse')  nu+=amt;
-      else if(rule.role==='pharma') ph+=amt;
+      if(!filled[rule.role]) return;
+      const type=rule.commType||'fixed';
+      const key=(rule.productId||'')+'|'+(rule.role||'');
+      if(type==='salesAmount'||type==='threshold'||type==='salesStage'){
+        // 這類規則需要累加同 scope 的總金額
+        if(!ruleAgg[key]) ruleAgg[key]={rule, totalLineTotal:0, totalQty:0};
+        ruleAgg[key].totalLineTotal += price*qty;
+        ruleAgg[key].totalQty += qty;
+      } else {
+        // fixed / percent：逐件計算，直接加總
+        const amt=calcOneRule(rule, price, qty, price*qty);
+        if(rule.role==='doctor') dr+=amt;
+        else if(rule.role==='staff')  st+=amt;
+        else if(rule.role==='nurse')  nu+=amt;
+        else if(rule.role==='pharma') ph+=amt;
+      }
     });
   });
+
+  // ── Step3：對累加型規則用總金額計算 ──
+  Object.values(ruleAgg).forEach(({rule, totalLineTotal, totalQty})=>{
+    const amt=calcOneRule(rule, totalLineTotal/totalQty||0, totalQty, totalLineTotal);
+    console.log('[calcComm] 累加規則 role:'+rule.role+' type:'+rule.commType+' thres:'+rule.commThreshold+' totalLineTotal:'+totalLineTotal+' → NT$'+amt);
+    if(rule.role==='doctor') dr+=amt;
+    else if(rule.role==='staff')  st+=amt;
+    else if(rule.role==='nurse')  nu+=amt;
+    else if(rule.role==='pharma') ph+=amt;
+  });
+
   console.log('[calcComm] 結果 dr:'+dr+' st:'+st+' nu:'+nu+' ph:'+ph);
-  console.groupEnd();
   return {dr,st,nu,ph};
 }
 
