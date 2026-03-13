@@ -319,53 +319,15 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
 <script>
 const SALES_KEY='clinicSalesLog',GS_KEY='gsUrl',STAFF_KEY='clinicStaff',PRODUCTS_KEY='clinicProducts',CLINIC_KEY='clinicClinics',PROMO_KEY='clinicPromos',COMM_KEY='clinicCommRules';
 
-const DEFAULT_PRODUCTS=[
-  {cat:'蛋白代餐',id:'p1',emoji:'🍫',name:'巧克力',price:90,group:'protein',active:true,description:''},
-  {cat:'蛋白代餐',id:'p2',emoji:'☕',name:'觀音拿鐵',price:90,group:'protein',active:true},
-  {cat:'蛋白代餐',id:'p3',emoji:'🌿',name:'芒果百香',price:90,group:'protein',active:true},
-  {cat:'蛋白代餐',id:'p4',emoji:'🥛',name:'無添加原味',price:90,group:'protein',active:true},
-  {cat:'蛋白代餐',id:'p5',emoji:'🍎',name:'草莓蘋果',price:90,group:'protein',active:true},
-  {cat:'蛋白代餐',id:'p6',emoji:'🍵',name:'抹茶拿鐵',price:90,group:'protein',active:true},
-  {cat:'蛋白代餐',id:'p7',emoji:'🌾',name:'杏仁燕麥',price:90,group:'protein',active:true},
-  {cat:'蛋白代餐',id:'p8',emoji:'🖤',name:'黑芝麻',price:90,group:'protein',active:true},
-  {cat:'Q飽纖燃飲',id:'m1',emoji:'🍋',name:'檸果拿鐵',price:100,group:'mct',active:true},
-  {cat:'Q飽纖燃飲',id:'m2',emoji:'🫐',name:'莓果優格',price:100,group:'mct',active:true},
-  {cat:'Q飽纖燃飲',id:'m3',emoji:'🥭',name:'百香芒果',price:100,group:'mct',active:true},
-  {cat:'Q飽纖燃飲',id:'m4',emoji:'🌸',name:'荔枝玫瑰',price:100,group:'mct',active:true},
-  {cat:'看診套組',id:'pk1',emoji:'📦',name:'中碳套組',price:1000,group:'package',detail:'14包蛋白代餐｜一天兩次',badge:'熱銷',active:true},
-  {cat:'看診套組',id:'pk2',emoji:'📦',name:'低碳套組',price:1500,group:'package',detail:'21包蛋白代餐｜一天三次',badge:'推薦',active:true},
-  {cat:'盒裝膠囊',id:'c1',emoji:'💊',name:'好燃對策',price:960,group:'capsule',active:true},
-  {cat:'盒裝膠囊',id:'c2',emoji:'💊',name:'碳水對策',price:800,group:'capsule',active:true},
-  {cat:'盒裝膠囊',id:'c3',emoji:'💊',name:'甘好腸寶',price:1260,group:'capsule',active:true},
-  {cat:'盒裝膠囊',id:'c4',emoji:'💊',name:'好輕鬆',price:600,group:'capsule',active:true},
-  {cat:'盒裝膠囊',id:'c5',emoji:'💊',name:'好元氣',price:350,group:'capsule',active:true},
-  {cat:'其他營養',id:'o1',emoji:'🥚',name:'拿鐵蛋白棒',price:400,group:'other',active:true},
-  {cat:'其他營養',id:'o2',emoji:'🌿',name:'健健粉',price:420,group:'other',active:true},
-  {cat:'其他營養',id:'o3',emoji:'🔵',name:'複方蛋白粉',price:1100,group:'other',active:true},
-];
+// 預設商品已移除，全部由 Google Sheet 商品主檔同步
+const DEFAULT_PRODUCTS=[];
 
 // 買6送1預設值（當無促銷活動時的 fallback）
 const BUNDLE={protein:{unit:90,bundle:540},mct:{unit:100,bundle:600}};
 const CAT_EMOJI={'蛋白代餐':'🥛','Q飽纖燃飲':'💧','看診套組':'🎁','盒裝膠囊':'💊','其他營養':'🌿'};
 
 function getProducts(){
-  try{
-    const s=localStorage.getItem(PRODUCTS_KEY);
-    if(!s) return DEFAULT_PRODUCTS;
-    const all=JSON.parse(s);
-    // 有 Sheet 資料時（id 含 custom_），去除同名的舊預設值（id 為短碼如 p1/m1）
-    const hasSheetData=all.some(p=>String(p.id||'').startsWith('custom_'));
-    if(!hasSheetData) return all;
-    // 去重：同名商品保留 Sheet 版本（id 以 custom_ 開頭）
-    const byName={};
-    all.forEach(p=>{
-      const key=(p.cat||'')+'|'+(p.name||'');
-      const existing=byName[key];
-      const isSheet=String(p.id||'').startsWith('custom_');
-      if(!existing || isSheet) byName[key]=p;
-    });
-    return Object.values(byName);
-  }catch(e){return DEFAULT_PRODUCTS;}
+  try{const s=localStorage.getItem(PRODUCTS_KEY);return s?JSON.parse(s):[];}catch(e){return[];}
 }
 const DEFAULT_CLINICS=['鶯歌院區','三樹院區','樹林院區','桃園院區','土城院區','八德院區','龍潭院區','大溪院區','大竹院區','大浦院區','平鎮院區','埔心院區'];
 function getClinics(){try{const s=localStorage.getItem(CLINIC_KEY);return s?JSON.parse(s):DEFAULT_CLINICS;}catch(e){return DEFAULT_CLINICS;}}
@@ -450,8 +412,9 @@ document.addEventListener('DOMContentLoaded', async ()=>{
             catDescription:trimmed.catDescription||''
           };
         });
+        // 清掉舊的預設假資料，只保留 Sheet 的真實商品
         localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
-        console.info('[products] 已同步商品，共', products.length, '項');
+        console.info('[products] 已同步商品，共', products.length, '項（已覆蓋預設資料）');
       }
 
       // 人員名單：role 欄 + name 欄，轉成 {doctors,staff,nurses,pharmas}
@@ -791,7 +754,7 @@ function cartHtml(){
   const cust=document.getElementById('customerName').value.trim();
   const clinic=document.getElementById('clinicSelect').value;
   const cashVal=document.getElementById('cashInput')?.value||'';
-  const ok=items.length>0&&doc&&cust&&clinic;
+  const ok=items.length>0&&cust&&clinic;
   return `
     <div class="sb-head">
       <h2>🧾 購物清單</h2>
@@ -835,8 +798,8 @@ function renderSidebar(){
   const items=buildItems(),total=items.reduce((s,i)=>s+i.price,0);
   const doc=document.getElementById('doctorSelect').value;
   const cust=document.getElementById('customerName').value.trim();
-  document.getElementById('step1').className='step-item'+(doc&&cust?' done':' active');
-  document.getElementById('step2').className='step-item'+(items.length>0?' done':doc&&cust?' active':'');
+  document.getElementById('step1').className='step-item'+(cust?' done':' active');
+  document.getElementById('step2').className='step-item'+(items.length>0?' done':cust?' active':'');
   document.getElementById('step3').className='step-item'+(total>0?' active':'');
 }
 
