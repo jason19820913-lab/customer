@@ -286,11 +286,11 @@ tbody tr:hover td{background:var(--sage-pale);}
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
       <span style="font-size:11px;font-weight:700;color:var(--brown);">日期：</span>
       <div style="display:flex;gap:5px;flex-wrap:wrap;" id="dateFilterBtns">
-        <button class="clinic-filter-btn active" onclick="filterDate('today',this)">今日</button>
+        <button class="clinic-filter-btn" onclick="filterDate('today',this)">今日</button>
         <button class="clinic-filter-btn" onclick="filterDate('yesterday',this)">昨日</button>
         <button class="clinic-filter-btn" onclick="filterDate('week',this)">本週</button>
         <button class="clinic-filter-btn" onclick="filterDate('month',this)">本月</button>
-        <button class="clinic-filter-btn" onclick="filterDate('all',this)">全部</button>
+        <button class="clinic-filter-btn active" onclick="filterDate('all',this)">全部</button>
       </div>
       <div style="display:flex;align-items:center;gap:4px;margin-left:4px;">
         <input type="date" id="dateFrom" style="font-size:11px;padding:3px 7px;border:1.5px solid #D0DEAD;border-radius:10px;font-family:inherit;color:var(--brown);outline:none;" onchange="filterDateCustom()">
@@ -853,14 +853,14 @@ function switchPage(p){
 
 // ── STATS ──
 let activeCF='';
-let activeDateMode='today'; // today/yesterday/week/month/all/custom
+let activeDateMode='all'; // today/yesterday/week/month/all/custom
 let activeDateFrom='', activeDateTo='';
 
 function filterDate(mode, btn){
   activeDateMode=mode;
   activeDateFrom=''; activeDateTo='';
-  document.getElementById('dateFrom').value='';
-  document.getElementById('dateTo').value='';
+  const dfEl=document.getElementById('dateFrom'); if(dfEl) dfEl.value='';
+  const dtEl=document.getElementById('dateTo'); if(dtEl) dtEl.value='';
   document.querySelectorAll('#dateFilterBtns .clinic-filter-btn').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
   renderStats();
@@ -873,6 +873,9 @@ function filterDateCustom(){
     document.querySelectorAll('#dateFilterBtns .clinic-filter-btn').forEach(b=>b.classList.remove('active'));
   }
   renderStats();
+}
+function getClinics(){
+  try{const s=localStorage.getItem(CLINIC_KEY);return s?JSON.parse(s):DEFAULT_CLINICS;}catch(e){return DEFAULT_CLINICS;}
 }
 function renderClinicFilterBtns(){
   const clinics=getClinics();
@@ -997,16 +1000,14 @@ function renderStats(){
   // 日期過濾
   const today=new Date(); today.setHours(0,0,0,0);
   function parseEntryDate(e){
-    // 支援多種日期格式
-    const raw=e.date||'';
+    const raw=(e.date||'').trim();
     if(!raw) return null;
-    // ISO or YYYY-MM-DD
-    const d=new Date(raw);
-    if(!isNaN(d)) return d;
-    // zh-TW 格式 2026/03/13
-    const m=raw.match(/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+    // 直接抓年月日數字，相容所有格式：2026/3/13、2026-03-13、2026年3月13日 等
+    const m=raw.match(/(\d{4})[^\d]+(\d{1,2})[^\d]+(\d{1,2})/);
     if(m) return new Date(parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3]));
-    return null;
+    // ISO timestamp fallback
+    const d=new Date(raw);
+    return isNaN(d)?null:d;
   }
   function inDateRange(e){
     const d=parseEntryDate(e);
