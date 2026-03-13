@@ -422,6 +422,7 @@ async function gasAppend(sheet,headers,row,ensureCols,insertBefore){
   return r.json();
 }
 
+function getStaff(){try{const s=localStorage.getItem(STAFF_KEY);return s?JSON.parse(s):{doctors:[],staff:[],nurses:[],pharmas:[]};}catch(e){return{doctors:[],staff:[],nurses:[],pharmas:[]};}}
 function getStaffRole(role){try{const s=localStorage.getItem(STAFF_KEY);return s?JSON.parse(s)[role]||[]:[];}catch(e){return[];}}
 function getDoctors(){return getStaffRole('doctors');}
 function getStaffList(){return getStaffRole('staff');}
@@ -1035,13 +1036,30 @@ function verifyPin(){
     if(inp) inp.value='';
     if(val) val.value='';
   });
-  renderModalDDs();
+  // 若 localStorage 沒有人員資料，先從 Sheet 同步再顯示
+  const staffData=getStaff();
+  const hasStaff=(staffData.doctors||[]).length+(staffData.staff||[]).length+(staffData.nurses||[]).length+(staffData.pharmas||[]).length;
+  if(!hasStaff && gasUrl()){
+    document.getElementById('pinModalMsg').textContent='🔄 正在載入人員名單...';
+    gasRead('人員名單').then(sd=>{
+      if(sd.status==='ok'&&sd.rows){
+        const s={doctors:[],staff:[],nurses:[],pharmas:[]};
+        sd.rows.forEach(r=>{const role=r['角色'],name=String(r['姓名']||'').trim();if(s[role]!==undefined&&name)s[role].push(name);});
+        localStorage.setItem(STAFF_KEY,JSON.stringify(s));
+      }
+      document.getElementById('pinModalMsg').textContent='請填寫當班人員資訊（可部分填寫）';
+      renderModalDDs();
+    }).catch(()=>renderModalDDs());
+  } else {
+    renderModalDDs();
+  }
 }
 
 // Modal 內員工 dropdown
 function renderModalDDs(){
   const staffData=getStaff();
   const map={Doctor:staffData.doctors||[],Staff:staffData.staff||[],Nurse:staffData.nurses||[],Pharma:staffData.pharmas||[]};
+  console.log('[renderModalDDs] staff data:', JSON.stringify(staffData));
   Object.entries(map).forEach(([role,names])=>{
     const dd=document.getElementById('modal'+role+'Dd');
     if(!dd) return;
