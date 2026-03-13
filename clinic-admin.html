@@ -308,6 +308,11 @@ tbody tr:hover td{background:var(--sage-pale);}
       <div class="stat-card"><div class="stat-icon">👩‍⚕️</div><div class="stat-num" id="statNu">NT$ 0</div><div class="stat-label">護理師抽成</div></div>
       <div class="stat-card"><div class="stat-icon">💊</div><div class="stat-num" id="statPh">NT$ 0</div><div class="stat-label">藥師抽成</div></div>
     </div>
+    <div class="section-title" style="margin-top:20px;">
+      <span>人員分潤摘要</span>
+    </div>
+    <div id="commSummaryGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:20px;"></div>
+
     <div class="section-title">
       <span>訂單明細</span>
       <button class="btn-sm" onclick="clearLog()">🗑️ 清除紀錄</button>
@@ -965,13 +970,46 @@ function renderStats(){
   document.getElementById('statNu').textContent='NT$'+tnu.toLocaleString();
   document.getElementById('statPh').textContent='NT$'+tph.toLocaleString();
 
-  // 表格動態欄：從商品主檔讀取，key 格式與 itemQty 完全一致（分類-名稱）
-  const products=getAdminProducts().filter(p=>p.active!==false);
+  // 表格動態欄：只顯示本次篩選範圍內有銷售的商品欄位
   const statKeys=[];
-  products.forEach(p=>{
-    const k=p.cat?`${p.cat}-${p.name}`:p.name;
-    if(!statKeys.includes(k))statKeys.push(k);
+  log.forEach(e=>{
+    if(e.itemQty){Object.keys(e.itemQty).forEach(k=>{if(e.itemQty[k]>0&&!statKeys.includes(k))statKeys.push(k);});}
+    else if(e.items){e.items.split('、').forEach(part=>{const m=part.match(/^(.+?)×/);if(m&&!statKeys.includes(m[1].trim()))statKeys.push(m[1].trim());});}
   });
+
+  // 人員分潤摘要卡片
+  const commByPerson={};
+  const roleLabel={doctor:'醫師',staff:'櫃檯',nurse:'護理師',pharma:'藥師'};
+  log.forEach(e=>{
+    const cm=getEntryComm(e);
+    [['doctor',e.doctor,cm.dr],['staff',e.staff,cm.st],['nurse',e.nurse,cm.nu],['pharma',e.pharma,cm.ph]].forEach(([role,name,amt])=>{
+      if(!name||!amt) return;
+      const key=name+'|'+role;
+      if(!commByPerson[key]) commByPerson[key]={name,role,total:0,orders:0};
+      commByPerson[key].total+=amt;
+      commByPerson[key].orders++;
+    });
+  });
+  const roleColor={doctor:'#4A9B8E',staff:'#6B8F71',nurse:'#8E6B9B',pharma:'#9B7B4A'};
+  const summaryEl=document.getElementById('commSummaryGrid');
+  if(summaryEl){
+    const entries=Object.values(commByPerson).sort((a,b)=>b.total-a.total);
+    if(entries.length===0){
+      summaryEl.innerHTML=`<div style="color:#aaa;font-size:12px;padding:8px;">無分潤資料</div>`;
+    } else {
+      summaryEl.innerHTML=entries.map(p=>`
+        <div style="background:#fff;border-radius:12px;padding:14px 16px;border:1.5px solid #E8EEE9;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <div style="width:32px;height:32px;border-radius:50%;background:${roleColor[p.role]||'#6B8F71'};color:#fff;font-size:13px;font-weight:900;display:flex;align-items:center;justify-content:center;">${p.name.charAt(0)}</div>
+            <div>
+              <div style="font-size:13px;font-weight:700;color:var(--charcoal);">${p.name}</div>
+              <div style="font-size:10px;color:#aaa;">${roleLabel[p.role]||p.role} · ${p.orders}筆</div>
+            </div>
+          </div>
+          <div style="font-size:20px;font-weight:900;color:${roleColor[p.role]||'#6B8F71'};">NT$${p.total.toLocaleString()}</div>
+        </div>`).join('');
+    }
+  }
 
   document.getElementById('statsHead').innerHTML=`<tr>
     <th>時間</th><th style="white-space:nowrap;">院區</th><th>顧客</th><th style="white-space:nowrap;">病歷號</th><th>醫師</th><th>櫃檯</th><th>護理師</th>
