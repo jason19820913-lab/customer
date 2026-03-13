@@ -1016,7 +1016,11 @@ function renderStats(){
     // ISO timestamp（含T，從 Sheet 載入）：直接取 UTC 日期
     if(raw.includes('T')){
       const d=new Date(raw);
-      if(!isNaN(d)) return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+      if(!isNaN(d)){
+        // GAS 日期用台灣時間午夜，需 +8h 轉回台灣日期
+        const tw=new Date(d.getTime()+8*60*60*1000);
+        return new Date(tw.getUTCFullYear(), tw.getUTCMonth(), tw.getUTCDate());
+      }
       return null;
     }
     // 本機格式 2026/3/14 或 2026-03-14 或 2026年3月14日
@@ -1206,14 +1210,17 @@ function fmtDate(v){
     try{
       const d=new Date(s);
       if(!isNaN(d)){
-        // ISO：用 UTC 日期（Sheet 回傳的日期不做時區轉換）
-        const y=d.getUTCFullYear(),mo=String(d.getUTCMonth()+1).padStart(2,'0'),dy=String(d.getUTCDate()).padStart(2,'0');
+        // GAS 日期：台灣時間午夜 = UTC 前一天 16:00，需 +8h 轉回台灣日期
+        // 例：台灣 2026/3/13 00:00 → GAS → 2026-03-12T16:00:00Z → +8h → 2026/3/13 ✓
+        //      台灣 2026/3/14 00:00 → GAS → 2026-03-13T16:00:00Z → +8h → 2026/3/14 ✓
+        const tw=new Date(d.getTime()+8*60*60*1000);
+        const y=tw.getUTCFullYear(),mo=String(tw.getUTCMonth()+1).padStart(2,'0'),dy=String(tw.getUTCDate()).padStart(2,'0');
         return y+'/'+mo+'/'+dy;
       }
     }catch(e){}
   }
-  // 本機存入格式 2026/3/14 → 補零
-  const m=s.match(/^(\d{4})[^\d]+(\d{1,2})[^\d]+(\d{1,2})/);
+  // 本機格式 2026/3/14 → 補零
+  const m=s.match(/(\d{4})[^\d]+(\d{1,2})[^\d]+(\d{1,2})/);
   if(m) return m[1]+'/'+String(m[2]).padStart(2,'0')+'/'+String(m[3]).padStart(2,'0');
   return s;
 }
@@ -1224,7 +1231,8 @@ function fmtTime(v){
     try{
       const d=new Date(s);
       if(!isNaN(d)){
-        // 時間用 UTC（Sheet 的 1899-12-29T19:19:00Z → UTC 19:19）
+        // GAS 把台灣時間直接放在 UTC 欄位（不轉換）
+        // 例：台灣 19:19 → 1899-12-29T19:19:00.000Z → 直接取 UTC = 19:19 ✓
         const h=String(d.getUTCHours()).padStart(2,'0'),mi=String(d.getUTCMinutes()).padStart(2,'0');
         return h+':'+mi;
       }
