@@ -282,23 +282,25 @@ tbody tr:hover td{background:var(--sage-pale);}
   <div class="page active" id="pageStats">
     <div class="page-title">銷售統計</div>
     <div class="page-sub" id="statsDateLabel">今日銷售概覽</div>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-      <span style="font-size:11px;font-weight:700;color:var(--brown);">篩選：</span>
-      <div style="display:flex;gap:5px;flex-wrap:wrap;" id="clinicFilterBtns">
-        <button class="clinic-filter-btn active" onclick="filterClinic('',this)">全部</button>
-        <button class="clinic-filter-btn" onclick="filterClinic('鶯歌院區',this)">鶯歌</button>
-        <button class="clinic-filter-btn" onclick="filterClinic('三樹院區',this)">三樹</button>
-        <button class="clinic-filter-btn" onclick="filterClinic('樹林院區',this)">樹林</button>
-        <button class="clinic-filter-btn" onclick="filterClinic('桃園院區',this)">桃園</button>
-        <button class="clinic-filter-btn" onclick="filterClinic('土城院區',this)">土城</button>
-        <button class="clinic-filter-btn" onclick="filterClinic('八德院區',this)">八德</button>
-        <button class="clinic-filter-btn" onclick="filterClinic('龍潭院區',this)">龍潭</button>
-        <button class="clinic-filter-btn" onclick="filterClinic('大溪院區',this)">大溪</button>
-        <button class="clinic-filter-btn" onclick="filterClinic('大竹院區',this)">大竹</button>
-        <button class="clinic-filter-btn" onclick="filterClinic('大浦院區',this)">大浦</button>
-        <button class="clinic-filter-btn" onclick="filterClinic('平鎮院區',this)">平鎮</button>
-        <button class="clinic-filter-btn" onclick="filterClinic('埔心院區',this)">埔心</button>
+    <!-- 日期篩選 -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+      <span style="font-size:11px;font-weight:700;color:var(--brown);">日期：</span>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;" id="dateFilterBtns">
+        <button class="clinic-filter-btn active" onclick="filterDate('today',this)">今日</button>
+        <button class="clinic-filter-btn" onclick="filterDate('yesterday',this)">昨日</button>
+        <button class="clinic-filter-btn" onclick="filterDate('week',this)">本週</button>
+        <button class="clinic-filter-btn" onclick="filterDate('month',this)">本月</button>
+        <button class="clinic-filter-btn" onclick="filterDate('all',this)">全部</button>
       </div>
+      <div style="display:flex;align-items:center;gap:4px;margin-left:4px;">
+        <input type="date" id="dateFrom" style="font-size:11px;padding:3px 7px;border:1.5px solid #D0DEAD;border-radius:10px;font-family:inherit;color:var(--brown);outline:none;" onchange="filterDateCustom()">
+        <span style="font-size:11px;color:#aaa;">～</span>
+        <input type="date" id="dateTo" style="font-size:11px;padding:3px 7px;border:1.5px solid #D0DEAD;border-radius:10px;font-family:inherit;color:var(--brown);outline:none;" onchange="filterDateCustom()">
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+      <span style="font-size:11px;font-weight:700;color:var(--brown);">院區：</span>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;" id="clinicFilterBtns"></div>
     </div>
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-num" id="statRev">NT$ 0</div><div class="stat-label">今日總營收</div></div>
@@ -851,7 +853,40 @@ function switchPage(p){
 
 // ── STATS ──
 let activeCF='';
-function filterClinic(c,btn){activeCF=c;document.querySelectorAll('.clinic-filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderStats();}
+let activeDateMode='today'; // today/yesterday/week/month/all/custom
+let activeDateFrom='', activeDateTo='';
+
+function filterDate(mode, btn){
+  activeDateMode=mode;
+  activeDateFrom=''; activeDateTo='';
+  document.getElementById('dateFrom').value='';
+  document.getElementById('dateTo').value='';
+  document.querySelectorAll('#dateFilterBtns .clinic-filter-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderStats();
+}
+function filterDateCustom(){
+  activeDateFrom=document.getElementById('dateFrom').value;
+  activeDateTo=document.getElementById('dateTo').value;
+  if(activeDateFrom||activeDateTo){
+    activeDateMode='custom';
+    document.querySelectorAll('#dateFilterBtns .clinic-filter-btn').forEach(b=>b.classList.remove('active'));
+  }
+  renderStats();
+}
+function renderClinicFilterBtns(){
+  const clinics=getClinics();
+  const container=document.getElementById('clinicFilterBtns');
+  if(!container) return;
+  container.innerHTML=[
+    `<button class="clinic-filter-btn${activeCF===''?' active':''}" onclick="filterClinic('',this)">全部</button>`,
+    ...clinics.map(cl=>{
+      const short=cl.replace('院區','');
+      return `<button class="clinic-filter-btn${activeCF===cl?' active':''}" onclick="filterClinic('${cl}',this)">${short}</button>`;
+    })
+  ].join('');
+}
+function filterClinic(c,btn){activeCF=c;document.querySelectorAll('#clinicFilterBtns .clinic-filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderStats();}
 
 const COMM_RULES={'複方蛋白粉':{dr:100,st:20,ph:0},'蛋白代餐':{dr:100,st:10,ph:0},'Q飽纖燃飲':{dr:100,st:10,ph:0},'健健糖':{dr:50,st:10,ph:0},'蛋白棒':{dr:50,st:10,ph:0},'防蚊液':{dr:0,st:0,ph:30},'金鶯涼喉':{dr:0,st:0,ph:10},'好燃對策':{dr:0,st:0,ph:100},'碳水對策':{dr:0,st:0,ph:100},'好輕鬆':{dr:0,st:0,ph:50},'好元氣':{dr:0,st:0,ph:50},'甘好睡寶':{dr:0,st:0,ph:100},'中碳套組':{dr:100,st:10,ph:0},'低碳套組':{dr:100,st:10,ph:0},'拿鐵蛋白棒':{dr:50,st:10,ph:0},'健健粉':{dr:50,st:10,ph:0}};
 // ── 後台分潤計算（與前台邏輯一致）──
@@ -957,8 +992,43 @@ function getEntryComm(e){
 }
 
 function renderStats(){
+  renderClinicFilterBtns();
   const allLog=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
-  const log=activeCF?allLog.filter(e=>(e.clinic||'')===activeCF):allLog;
+  // 日期過濾
+  const today=new Date(); today.setHours(0,0,0,0);
+  function parseEntryDate(e){
+    // 支援多種日期格式
+    const raw=e.date||'';
+    if(!raw) return null;
+    // ISO or YYYY-MM-DD
+    const d=new Date(raw);
+    if(!isNaN(d)) return d;
+    // zh-TW 格式 2026/03/13
+    const m=raw.match(/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+    if(m) return new Date(parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3]));
+    return null;
+  }
+  function inDateRange(e){
+    const d=parseEntryDate(e);
+    if(!d) return true;
+    d.setHours(0,0,0,0);
+    if(activeDateMode==='today') return d.getTime()===today.getTime();
+    if(activeDateMode==='yesterday'){const y=new Date(today);y.setDate(y.getDate()-1);return d.getTime()===y.getTime();}
+    if(activeDateMode==='week'){const w=new Date(today);w.setDate(w.getDate()-w.getDay());return d>=w&&d<=today;}
+    if(activeDateMode==='month') return d.getFullYear()===today.getFullYear()&&d.getMonth()===today.getMonth();
+    if(activeDateMode==='all') return true;
+    if(activeDateMode==='custom'){
+      if(activeDateFrom&&d<new Date(activeDateFrom)) return false;
+      if(activeDateTo&&d>new Date(activeDateTo)) return false;
+      return true;
+    }
+    return true;
+  }
+  // 更新副標題
+  const labelMap={today:'今日',yesterday:'昨日',week:'本週',month:'本月',all:'全部',custom:'自訂區間'};
+  document.getElementById('statsDateLabel').textContent=(labelMap[activeDateMode]||'')+'銷售概覽'+(activeCF?' · '+activeCF:'');
+
+  const log=allLog.filter(e=>inDateRange(e)&&(!activeCF||(e.clinic||'')===activeCF));
   const rev=log.reduce((s,e)=>s+(e.total||0),0);
   let tdr=0,tst=0,tnu=0,tph=0;
   log.forEach(e=>{const cm=getEntryComm(e);tdr+=cm.dr;tst+=cm.st;tnu+=cm.nu;tph+=cm.ph;});
