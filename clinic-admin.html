@@ -317,8 +317,12 @@ tbody tr:hover td{background:var(--sage-pale);}
 
     <div class="section-title">
       <span>訂單明細</span>
-      <button class="btn-sm" onclick="clearLog()">🗑️ 清除紀錄</button>
+      <div style="display:flex;gap:6px;">
+        <button class="btn-sm" onclick="loadSalesFromSheet()" style="background:var(--sage);color:#fff;border-color:var(--sage);">☁️ 從 Sheet 載入</button>
+        <button class="btn-sm" onclick="clearLog()">🗑️ 清除本機</button>
+      </div>
     </div>
+    <div id="salesSyncStatus" style="font-size:11px;color:#888;margin-bottom:8px;display:none;"></div>
     <div class="tbl-wrap">
       <table id="statsTable" style="min-width:900px;">
         <thead id="statsHead"></thead>
@@ -1115,7 +1119,65 @@ function renderStats(){
   }).join('');
 }
 
-function clearLog(){if(!confirm('確定要清除所有銷售紀錄嗎？'))return;localStorage.setItem(SALES_KEY,'[]');renderStats();toast('🗑️ 紀錄已清除');}
+function clearLog(){
+  if(!confirm('清除本機銷售紀錄？\n（Google Sheet 的資料不受影響，可隨時重新從 Sheet 載入）'))return;
+  localStorage.setItem(SALES_KEY,'[]');
+  renderStats();
+  toast('🗑️ 本機紀錄已清除');
+}
+
+async function loadSalesFromSheet(){
+  const u=gasUrl();
+  const statusEl=document.getElementById('salesSyncStatus');
+  if(!u){toast('⚠️ 請先在系統設定填入 GAS 網址');return;}
+  statusEl.style.display='block';
+  statusEl.textContent='☁️ 從 Google Sheet 載入銷售紀錄中...';
+  try{
+    const d=await gasRead('銷售紀錄');
+    if(d.status!=='ok'||!d.rows){statusEl.textContent='❌ 載入失敗：'+JSON.stringify(d);return;}
+    // 將 Sheet 欄位轉換成 entry 格式
+    const entries=d.rows.map(r=>{
+      // 找出商品欄（非固定欄位）
+      const FIXED=['日期','時間','院區','顧客姓名','身分證遮罩','病歷號','當班醫師','櫃檯人員','護理師','藥師','結帳金額','付款方式','醫師抽成','櫃檯抽成','護理師抽成','藥師抽成','身分證雜湊'];
+      const itemQty={};
+      const itemParts=[];
+      Object.keys(r).forEach(k=>{
+        if(FIXED.includes(k)) return;
+        const q=Number(r[k])||0;
+        if(q>0){itemQty[k]=q;itemParts.push(k+'×'+q);}
+      });
+      return {
+        date: r['日期']||'',
+        time: r['時間']||'',
+        clinic: r['院區']||'',
+        customer: r['顧客姓名']||'',
+        idMask: r['身分證遮罩']||'',
+        phone: r['病歷號']||'',
+        doctor: r['當班醫師']||'',
+        staff: r['櫃檯人員']||'',
+        nurse: r['護理師']||'',
+        pharma: r['藥師']||'',
+        items: itemParts.join('、'),
+        itemQty,
+        total: Number(r['結帳金額'])||0,
+        payMethod: r['付款方式']==='現金'||r['付款方式']==='cash'?'cash':'transfer',
+        doctorComm: Number(r['醫師抽成'])||0,
+        staffComm: Number(r['櫃檯抽成'])||0,
+        nurseComm: Number(r['護理師抽成'])||0,
+        pharmaComm: Number(r['藥師抽成'])||0,
+        idHash: r['身分證雜湊']||'',
+      };
+    }).filter(e=>e.date||e.customer);
+    localStorage.setItem(SALES_KEY, JSON.stringify(entries));
+    renderStats();
+    statusEl.textContent=`✅ 已從 Sheet 載入 ${entries.length} 筆銷售紀錄`;
+    toast('☁️ 已載入 '+entries.length+' 筆銷售紀錄');
+    setTimeout(()=>{statusEl.style.display='none';},4000);
+  }catch(e){
+    statusEl.textContent='❌ 載入失敗：'+e.message;
+    console.error('[loadSalesFromSheet]',e);
+  }
+}
 
 // ── PATIENT LOOKUP ──
 // 格式化 Google Sheet 回傳的日期/時間
