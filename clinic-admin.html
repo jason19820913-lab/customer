@@ -884,26 +884,54 @@ function calcComm(itemsStr, hasDoctor, hasStaff, hasNurse, hasPharma){
   let dr=0,st=0,nu=0,ph=0;
   if(!itemsStr) return{dr,st,nu,ph};
   const filled={doctor:hasDoctor,staff:hasStaff,nurse:hasNurse,pharma:hasPharma};
+
+  // Step1：解析商品清單
+  const lines=[];
   itemsStr.split('、').forEach(part=>{
-    const m=part.match(/^(.+?)×(\d+)/);if(!m)return;
-    const rawName=m[1].trim(), qty=parseInt(m[2])||1;
-    // 支援「分類-名稱」格式：先嘗試全名，再嘗試去掉分類前綴
-    let product=products.find(p=>p.name===rawName||(p.cat&&p.cat+'-'+p.name===rawName));
-    if(!product&&rawName.includes('-')){
-      const shortName=rawName.split('-').slice(1).join('-');
-      product=products.find(p=>p.name===shortName);
-    }
+    const m=part.match(/^(.+?)x(\d+)|^(.+?)×(\d+)/);if(!m)return;
+    const rawName=(m[1]||m[3]).trim(), qty=parseInt(m[2]||m[4])||1;
+    const catPart2=rawName.includes('-')?rawName.split('-')[0].trim():'';
+    const shortName2=(rawName.includes('-')?rawName.split('-').slice(1).join('-'):rawName).trim();
+    let product=products.find(p=>{
+      const pName=(p.name||'').trim(), pCat=(p.cat||'').trim();
+      return catPart2 && pCat===catPart2 && pName===shortName2;
+    }) || products.find(p=>(p.name||'').trim()===shortName2)
+      || products.find(p=>(p.name||'').trim()===rawName.trim());
     if(!product) return;
-    const price=product.price||0, lineTotal=price*qty;
+    lines.push({product, qty, price:product.price||0});
+  });
+
+  // Step2：固定/百分比逐件算；salesAmount/threshold 累加後算
+  const ruleAgg={};
+  lines.forEach(({product, qty, price})=>{
     findCommRulesAdmin(product).forEach(rule=>{
-      if(filled[rule.role]===false) return; // 明確傳 false 才跳過；undefined 時（舊資料fallback）不跳過
-      const amt=calcOneRuleAdmin(rule,price,qty,lineTotal);
-      if(rule.role==='doctor') dr+=amt;
-      else if(rule.role==='staff')  st+=amt;
-      else if(rule.role==='nurse')  nu+=amt;
-      else if(rule.role==='pharma') ph+=amt;
+      if(filled[rule.role]===false) return;
+      const type=rule.commType||'fixed';
+      const key=(rule.productId||'')+'|'+(rule.role||'');
+      if(type==='salesAmount'||type==='threshold'||type==='salesStage'){
+        if(!ruleAgg[key]) ruleAgg[key]={rule, totalLineTotal:0, totalQty:0};
+        ruleAgg[key].totalLineTotal += price*qty;
+        ruleAgg[key].totalQty += qty;
+      } else {
+        const amt=calcOneRuleAdmin(rule,price,qty,price*qty);
+        if(rule.role==='doctor') dr+=amt;
+        else if(rule.role==='staff')  st+=amt;
+        else if(rule.role==='nurse')  nu+=amt;
+        else if(rule.role==='pharma') ph+=amt;
+      }
     });
   });
+
+  // Step3：累加型規則用總金額計算
+  Object.values(ruleAgg).forEach(({rule, totalLineTotal, totalQty})=>{
+    const avgPrice=totalQty?totalLineTotal/totalQty:0;
+    const amt=calcOneRuleAdmin(rule,avgPrice,totalQty,totalLineTotal);
+    if(rule.role==='doctor') dr+=amt;
+    else if(rule.role==='staff')  st+=amt;
+    else if(rule.role==='nurse')  nu+=amt;
+    else if(rule.role==='pharma') ph+=amt;
+  });
+
   return{dr,st,nu,ph};
 }
 function getQty(e,key){
@@ -1673,6 +1701,22 @@ const COMM_ROLE_KEYS=[
 
 let editCommRules=[];
 
+function dedupCommRules(){
+  const s=localStorage.getItem(COMM_KEY);
+  if(!s) return;
+  const all=JSON.parse(s);
+  const seen={};const deduped=[];
+  all.forEach(r=>{
+    const key=(r.productId||'')+'|'+(r.role||'');
+    if(!seen[key]){seen[key]=true;deduped.push(r);}
+  });
+  const removed=all.length-deduped.length;
+  localStorage.setItem(COMM_KEY,JSON.stringify(deduped));
+  editCommRules=deduped.filter(r=>r.productId&&r.role);
+  saveCommRules();renderCommPage();
+  toast(`✅ 已清除 ${removed} 條重複規則，剩餘 ${deduped.length} 條`);
+}
+
 function showRawCommRules(){
   const rawS=localStorage.getItem(COMM_KEY);
   const raw=rawS?JSON.parse(rawS):[];
@@ -1701,17 +1745,26 @@ function renderCommPage(){
   const el=document.getElementById('commList');
   if(!el)return;
 
-  // 診斷：顯示 localStorage 原始規則狀況
+  // 診斷：偵測無效規則 + 重複規則
   const rawS=localStorage.getItem(COMM_KEY);
   const rawAll=rawS?JSON.parse(rawS):[];
   const invalidRules=rawAll.filter(r=>!r.role||!r.productId);
+  // 重複規則：同一 productId + role 出現超過一次
+  const seen={};const dupRules=[];
+  rawAll.forEach(r=>{
+    const key=(r.productId||'')+'|'+(r.role||'');
+    if(seen[key]) dupRules.push(r);
+    else seen[key]=true;
+  });
   const diagEl=document.getElementById('commDiag');
   if(diagEl){
-    if(invalidRules.length>0){
+    const msgs=[];
+    if(invalidRules.length>0) msgs.push(`<span style="color:#c62828;">⚠️ ${invalidRules.length} 條格式不符（缺少 role 或 productId），已自動跳過</span>`);
+    if(dupRules.length>0) msgs.push(`<span style="color:#E65100;">⚠️ 偵測到 ${dupRules.length} 條重複規則（同商品+角色出現多次），只有第一條生效</span>
+      <button style="margin-left:8px;font-size:10px;padding:3px 10px;background:#E65100;color:#fff;border:none;border-radius:6px;cursor:pointer;" onclick="dedupCommRules()">一鍵清除重複</button>`);
+    if(msgs.length>0){
       diagEl.style.display='block';
-      diagEl.innerHTML=`<span style="color:#c62828;">⚠️ 偵測到 ${invalidRules.length} 條格式不符的規則（缺少 role 或 productId），這些規則已自動跳過。</span>
-        <br><span style="font-size:10px;color:#888;">請在後台重新設定這些規則，或按下「重新從 Sheet 同步」後再手動新增。</span>
-        <button style="margin-left:8px;font-size:10px;padding:2px 8px;cursor:pointer;" onclick="showRawCommRules()">查看原始資料</button>`;
+      diagEl.innerHTML=msgs.join('<br>')+`<button style="margin-left:12px;font-size:10px;padding:2px 8px;cursor:pointer;border:1px solid #ccc;border-radius:5px;background:#fff;" onclick="showRawCommRules()">查看原始</button>`;
     } else {
       diagEl.style.display='none';
     }
