@@ -1230,26 +1230,36 @@ function closeModal(){
 }
 
 function printReceipt(){
-  const area=document.getElementById('receiptArea');
-  const win=window.open('','_blank','width=400,height=600');
+  // 只取收據主體內容（排除 syncStatus 同步狀態列）
+  const msg=document.getElementById('modalMsg')?.textContent||'';
+  const receipt=document.getElementById('modalReceipt');
+  // 複製 receipt 內容並移除 syncStatus
+  const clone=receipt.cloneNode(true);
+  const sync=clone.querySelector('#syncStatus');
+  if(sync) sync.remove();
+
+  const win=window.open('','_blank','width=420,height=680');
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
     <title>擇木良食藥局收據</title>
     <style>
-      body{font-family:'Noto Sans TC',sans-serif;padding:20px;max-width:320px;margin:0 auto;font-size:12px;}
-      .receipt-row{display:flex;justify-content:space-between;padding:3px 0;}
-      h2{text-align:center;font-size:18px;margin:0 0 4px;}
-      .sub{text-align:center;color:#888;font-size:10px;margin-bottom:12px;}
-      hr{border:none;border-top:1px dashed #ccc;margin:8px 0;}
-      @media print{button{display:none}}
+      *{box-sizing:border-box;}
+      body{font-family:'Noto Sans TC',sans-serif;padding:24px 20px;max-width:320px;margin:0 auto;font-size:12px;color:#333;}
+      .receipt-row{display:flex;justify-content:space-between;padding:4px 0;}
+      hr{border:none;border-top:1px dashed #ccc;margin:10px 0;}
+      @media print{.no-print{display:none!important;}}
     </style>
   </head><body>
-    <h2>擇木良食藥局</h2>
-    <div class="sub">健康銷售收據</div>
+    <div style="text-align:center;margin-bottom:12px;">
+      <div style="font-size:20px;font-weight:900;color:#2d4a31;">擇木良食藥局</div>
+      <div style="font-size:11px;color:#888;margin-top:3px;">健康銷售收據</div>
+    </div>
     <hr>
-    ${area.innerHTML}
+    <p style="text-align:center;font-weight:700;margin:8px 0;">${msg}</p>
+    ${clone.innerHTML}
     <hr>
     <div style="text-align:center;color:#aaa;font-size:10px;margin-top:8px;">感謝您的購買，祝您身體健康 🌿</div>
-    <br><button onclick="window.print()" style="width:100%;padding:8px;background:#6B8F71;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;">🖨️ 列印</button>
+    <br>
+    <button class="no-print" onclick="window.print()" style="width:100%;padding:10px;background:#6B8F71;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;">🖨️ 列印</button>
   </body></html>`);
   win.document.close();
 }
