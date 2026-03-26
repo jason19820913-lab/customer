@@ -862,13 +862,26 @@ function buildItems(memberPromoOverride){
         isDiscount:true
       });
     } else if(memberPromo.type==='staffPrice'){
-      // 解析 staffPriceMap：每行 "商品名稱=優惠價"
+      // 解析 staffPriceMap：每行 "商品名稱=優惠價" 或 "_default_=優惠價"（套用到 scope 內所有商品）
       const priceMap={};
+      let defaultPrice=null;
       (memberPromo.staffPriceMap||'').split(/\n/).forEach(line=>{
         const m=line.trim().match(/^(.+?)=([\d.]+)$/);
-        if(m) priceMap[m[1].trim()]=Number(m[2]);
+        if(!m) return;
+        const key=m[1].trim(), val=Number(m[2]);
+        if(key==='_default_') defaultPrice=val;
+        else priceMap[key]=val;
       });
-      // 直接比對 cart 裡的個別商品（用商品主檔 name/cat 比對）
+
+      // scope 用來判斷哪些商品適用（同 memberDiscount 的範圍邏輯）
+      const scope=String(memberPromo.scope||'');
+      function inScope(p){
+        if(!scope||scope==='all') return true;
+        if(scope.startsWith('group:')) return (p.group||'')===(scope.slice(6));
+        if(scope.startsWith('cat:')) return (p.cat||'')===(scope.slice(4));
+        return false;
+      }
+
       let totalDiscount=0;
       const discountDetails=[];
       const allProducts=getProducts().filter(p=>p.active!==false);
@@ -876,7 +889,9 @@ function buildItems(memberPromoOverride){
         const qty=cart[p.id]||0;
         if(!qty) return;
         const pName=(p.name||'').trim();
-        const staffP=priceMap[pName];
+        // 優先查 priceMap 名稱，其次看是否在 scope 內用 defaultPrice
+        let staffP=priceMap[pName];
+        if(staffP===undefined && defaultPrice!==null && inScope(p)) staffP=defaultPrice;
         if(staffP===undefined) return;
         const origPrice=p.price||0;
         const diff=Math.round((origPrice-staffP)*qty);
