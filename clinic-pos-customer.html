@@ -863,8 +863,7 @@ function buildItems(memberPromoOverride){
     } else if(memberPromo.type==='staffPrice'){
       // 解析 staffPriceMap：每行 "商品名稱=優惠價"
       const priceMap={};
-      (memberPromo.staffPriceMap||'').split(/
-/).forEach(line=>{
+      (memberPromo.staffPriceMap||'').split(/\n/).forEach(line=>{
         const m=line.trim().match(/^(.+?)=([\d.]+)$/);
         if(m) priceMap[m[1].trim()]=Number(m[2]);
       });
