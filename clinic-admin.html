@@ -1707,7 +1707,7 @@ function savePmModal(){
 /* ══════════════════════════════════════════
    促銷活動管理
    ══════════════════════════════════════════ */
-const PROMO_HEADERS=['id','name','type','scope','buyQty','freeQty','discountValue','active','startDate','endDate'];
+const PROMO_HEADERS=['id','name','type','scope','buyQty','freeQty','discountValue','active','startDate','endDate','memberLabel','staffPriceMap'];
 const PROMO_TYPE_LABEL={buyNgetN:'🎁 買N送N',fixedDiscount:'💰 固定折扣',percentDiscount:'📉 百分比折',bundle:'📦 套組定價',memberDiscount:'👤 身份折扣',staffPrice:'🏷️ 員工優惠價'};
 
 let editPromos=[];
@@ -1779,7 +1779,9 @@ function savePromos(){
     id:p.id||'',name:p.name||'',type:p.type||'',scope:p.scope||'all',
     buyQty:p.buyQty||0,freeQty:p.freeQty||0,discountValue:p.discountValue||0,
     active:(p.active==='TRUE'||p.active===true)?'TRUE':'FALSE',
-    startDate:p.startDate||'',endDate:p.endDate||''
+    startDate:p.startDate||'',endDate:p.endDate||'',
+    memberLabel:p.memberLabel||'',
+    staffPriceMap:p.staffPriceMap||''
   }));
   gasWrite('促銷活動',PROMO_HEADERS,rows)
     .then(d=>d.status==='ok'?toast('☁️ 促銷活動已同步至 Google Sheet'):toast('⚠️ 同步失敗：'+d.msg))
