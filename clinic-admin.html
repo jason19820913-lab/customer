@@ -317,7 +317,15 @@ tbody tr:hover td{background:var(--sage-pale);}
 
     <div class="section-title">
       <span>訂單明細</span>
-      <div style="display:flex;gap:6px;">
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <select id="remarkFilter" style="font-size:11px;padding:4px 8px;border:1.5px solid #D0DEAD;border-radius:10px;font-family:inherit;color:var(--brown);background:#fff;cursor:pointer;" onchange="renderStats()">
+          <option value="">全部備註</option>
+          <option value="金醫師">金醫師</option>
+          <option value="猛健樂">猛健樂</option>
+          <option value="胰妥讚4週">胰妥讚4週</option>
+          <option value="胰妥讚8週">胰妥讚8週</option>
+          <option value="__none__">無備註</option>
+        </select>
         <button class="btn-sm" onclick="loadSalesFromSheet()" style="background:var(--sage);color:#fff;border-color:var(--sage);">☁️ 從 Sheet 載入</button>
         <button class="btn-sm" onclick="clearLog()">🗑️ 清除本機</button>
       </div>
@@ -1054,7 +1062,14 @@ function renderStats(){
   const labelMap={today:'今日',yesterday:'昨日',week:'本週',month:'本月',all:'全部',custom:'自訂區間'};
   document.getElementById('statsDateLabel').textContent=(labelMap[activeDateMode]||'')+'銷售概覽'+(activeCF?' · '+activeCF:'');
 
-  const log=allLog.filter(e=>inDateRange(e)&&(!activeCF||(e.clinic||'')===activeCF));
+  const activeRemark=document.getElementById('remarkFilter')?.value||'';
+  const log=allLog.filter(e=>{
+    if(!inDateRange(e)) return false;
+    if(activeCF&&(e.clinic||'')!==activeCF) return false;
+    if(activeRemark==='__none__') return !e.remark;
+    if(activeRemark&&(e.remark||'')!==activeRemark) return false;
+    return true;
+  });
   const rev=log.reduce((s,e)=>s+(e.total||0),0);
   let tdr=0,tst=0,tnu=0,tph=0;
   log.forEach(e=>{const cm=getEntryComm(e);tdr+=cm.dr;tst+=cm.st;tnu+=cm.nu;tph+=cm.ph;});
@@ -1130,10 +1145,10 @@ function renderStats(){
       <td><span style="font-size:10px;background:var(--sage-pale);color:var(--sage);padding:2px 7px;border-radius:9px;font-weight:600;white-space:nowrap;">${e.clinic||'-'}</span></td>
       <td><strong>${e.customer||''}</strong></td>
       <td style="white-space:nowrap;color:#888;font-size:11px;">${e.phone||'—'}</td>
+      <td style="white-space:nowrap;color:#666;font-size:11px;">${e.remark||'—'}</td>
       <td style="white-space:nowrap;">${e.doctor||'-'}</td>
       <td style="white-space:nowrap;">${e.staff||'-'}</td>
       <td style="white-space:nowrap;">${e.nurse||'-'}</td>
-      <td style="white-space:nowrap;color:#666;font-size:11px;">${e.remark||'—'}</td>
       ${statKeys.map(k=>qCell(getQty(e,k))).join('')}
       <td style="white-space:nowrap;"><strong style="color:var(--sage);">NT$${(e.total||0).toLocaleString()}</strong></td>
       <td><span class="tag ${e.payMethod==='cash'?'tag-cash':'tag-transfer'}">${e.payMethod==='cash'?'現金':'轉帳'}</span></td>
@@ -1161,7 +1176,7 @@ async function loadSalesFromSheet(){
     // 將 Sheet 欄位轉換成 entry 格式
     const entries=d.rows.map(r=>{
       // 找出商品欄（非固定欄位）
-      const FIXED=['日期','時間','院區','顧客姓名','身分證遮罩','病歷號','當班醫師','櫃檯人員','護理師','藥師','備註','結帳金額','付款方式','醫師抽成','櫃檯抽成','護理師抽成','藥師抽成','身分證雜湊'];
+      const FIXED=['日期','時間','院區','顧客姓名','身分證遮罩','病歷號','備註','當班醫師','櫃檯人員','護理師','藥師','結帳金額','付款方式','醫師抽成','櫃檯抽成','護理師抽成','藥師抽成','身分證雜湊'];
       const itemQty={};
       const itemParts=[];
       Object.keys(r).forEach(k=>{
