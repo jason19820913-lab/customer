@@ -670,14 +670,18 @@ function json(o) {
     </div>
     <div class="pm-form-grid">
       <div class="fg"><label>單價（NT$）</label><input type="number" id="pmPrice" placeholder="例：90" min="0"></div>
-      <div class="fg"><label>群組類型</label>
-        <select id="pmGroup">
+      <div class="fg">
+        <label>群組類型 <span style="font-size:9px;color:#888;">（可自訂，影響分潤/折扣的 group: 設定）</span></label>
+        <input type="text" id="pmGroup" list="pmGroupList" placeholder="例：protein、mct、capsule 或自訂名稱"
+          style="font-size:12px;">
+        <datalist id="pmGroupList">
           <option value="protein">蛋白代餐（買6送1）</option>
           <option value="mct">Q飽纖燃飲（買6送1）</option>
           <option value="package">看診套組（可選數量）</option>
           <option value="capsule">膠囊（單件）</option>
           <option value="other">其他（單件）</option>
-        </select>
+        </datalist>
+        <div style="font-size:10px;color:#aaa;margin-top:3px;">分潤/折扣設「group:protein」即套用至此群組</div>
       </div>
     </div>
     <div class="pm-form-grid full" id="pmDetailGroup" style="display:none;">
@@ -1449,7 +1453,8 @@ function renderProductManager(){
   const cats=[],groups={};
   products.forEach(p=>{if(!groups[p.cat]){cats.push(p.cat);groups[p.cat]=[];}groups[p.cat].push(p);});
   const CAT_EMOJI={'蛋白代餐':'🥛','Q飽纖燃飲':'💧','看診套組':'🎁','盒裝膠囊':'💊','其他營養':'🌿'};
-  const GROUP_LABEL={'protein':'蛋白代餐（買6送1）','mct':'Q飽（買6送1）','package':'套組','capsule':'膠囊','other':'其他'};
+  const GROUP_LABEL={'protein':'蛋白代餐（買6送1）','mct':'Q飽（買6送1）','package':'套組','capsule':'膠囊','other':'其他（單件）'};
+  // 自訂 group 直接顯示原始值
 
   document.getElementById('pmList').innerHTML=cats.map(cat=>`
     <div class="pm-grid" style="margin-bottom:12px;" data-cat="${cat}" draggable="false">
@@ -1671,7 +1676,7 @@ function updatePmFields(){
   const catVal=document.getElementById('pmCat').value;
   document.getElementById('pmNewCatGroup').style.display=catVal==='_new'?'block':'none';
 }
-document.getElementById('pmGroup').addEventListener('change',updatePmFields);
+document.getElementById('pmGroup').addEventListener('input',updatePmFields);
 document.getElementById('pmCat').addEventListener('change',updatePmFields);
 
 function savePmModal(){
