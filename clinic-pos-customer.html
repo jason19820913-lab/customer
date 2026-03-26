@@ -1191,17 +1191,17 @@ function renderMemberDiscountBtns(){
 }
 
 function toggleMemberDiscount(id){
-  if(selectedMemberPromoId===id){
-    selectedMemberPromoIds=new Set();
+  if(selectedMemberPromoIds.has(id)){
+    selectedMemberPromoIds.delete(id);
   } else {
-    selectedMemberPromoId=id;
+    selectedMemberPromoIds.add(id);
   }
   // 更新按鈕樣式
   const promos=getPromos().filter(p=>p.type==='memberDiscount'||p.type==='staffPrice');
   promos.forEach(p=>{
     const btn=document.getElementById('mdbtn_'+p.id);
     if(!btn) return;
-    const active=selectedMemberPromoId===p.id;
+    const active=selectedMemberPromoIds.has(p.id);
     btn.style.background=active?'var(--sage)':'#fff';
     btn.style.borderColor=active?'var(--sage)':'#D0DEAD';
     btn.style.color=active?'#fff':'var(--brown)';
