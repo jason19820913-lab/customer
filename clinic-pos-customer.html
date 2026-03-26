@@ -471,6 +471,7 @@ function getNurses(){return getStaffRole('nurses');}
 function getPharmas(){return getStaffRole('pharmas');}
 
 let cart={},payMethod='cash',ddState={doctor:'',staff:'',nurse:'',pharma:''},curCat='';
+let selectedMemberPromoIds=new Set(); // 目前選中的身份折扣（可多選）
 
 document.addEventListener('DOMContentLoaded', async ()=>{
   document.getElementById('headerDate').textContent=new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
@@ -895,7 +896,9 @@ function buildItems(memberPromoOverride){
 }
 
 function cartHtml(){
-  const items=buildItems(),total=items.reduce((s,i)=>s+i.price,0);
+  let items=[];
+  try{ items=buildItems(); }catch(e){ console.error('[buildItems error]',e); }
+  const total=items.reduce((s,i)=>s+i.price,0);
   const doc=document.getElementById('doctorSelect').value;
   const cust=document.getElementById('customerName').value.trim();
   const clinic=document.getElementById('clinicSelect').value;
@@ -941,7 +944,9 @@ function renderSidebar(){
   const b=document.getElementById('fabBadge');
   if(b){b.style.display=tot>0?'block':'none';b.textContent=tot;}
   // step bar
-  const items=buildItems(),total=items.reduce((s,i)=>s+i.price,0);
+  let items=[];
+  try{ items=buildItems(); }catch(e){ console.error('[renderSidebar buildItems error]',e); }
+  const total=items.reduce((s,i)=>s+i.price,0);
   const doc=document.getElementById('doctorSelect').value;
   const cust=document.getElementById('customerName').value.trim();
   document.getElementById('step1').className='step-item'+(cust?' done':' active');
@@ -1156,7 +1161,6 @@ function verifyPin(){
 
 // Modal 內員工 dropdown
 let activeMutexRole='staff';
-let selectedMemberPromoIds=new Set(); // 目前選中的身份折扣（可多選）
 
 function renderMemberDiscountBtns(){
   const promos=getPromos().filter(p=>p.type==='memberDiscount'||p.type==='staffPrice');
