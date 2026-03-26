@@ -1116,9 +1116,11 @@ function verifyPin(){
       }
       document.getElementById('pinModalMsg').textContent='請填寫當班人員資訊（可部分填寫）';
       renderModalDDs();
-    }).catch(()=>renderModalDDs());
+      renderMemberDiscountBtns();
+    }).catch(()=>{renderModalDDs();renderMemberDiscountBtns();});
   } else {
     renderModalDDs();
+    renderMemberDiscountBtns();
   }
 }
 
@@ -1131,7 +1133,21 @@ function renderMemberDiscountBtns(){
   const area=document.getElementById('memberDiscountArea');
   const btns=document.getElementById('memberDiscountBtns');
   if(!area||!btns) return;
-  if(!promos.length){area.style.display='none';return;}
+  if(!promos.length){
+    // 檢查 localStorage 裡所有促銷（包括未啟用）
+    try{
+      const allPromos=JSON.parse(localStorage.getItem('clinicPromos')||'[]');
+      const memberPromos=allPromos.filter(p=>p.type==='memberDiscount');
+      if(memberPromos.length>0){
+        // 有設定但可能過期或未啟用
+        area.style.display='block';
+        btns.innerHTML=`<span style="font-size:11px;color:#aaa;">（身份折扣已設定，但目前無啟用中的項目）</span>`;
+      } else {
+        area.style.display='none';
+      }
+    }catch(e){ area.style.display='none'; }
+    return;
+  }
   area.style.display='block';
   btns.innerHTML=promos.map(p=>`
     <button id="mdbtn_${p.id}"
@@ -1295,8 +1311,8 @@ async function doCheckout(){
 
   if(gasUrl()){
     try{
-      const FIXED_FRONT=['日期','時間','院區','顧客姓名','身分證遮罩','病歷號','當班醫師','櫃檯人員','護理師','藥師','備註'];
-      const FIXED_BACK=['結帳金額','付款方式','醫師抽成','櫃檯抽成','護理師抽成','藥師抽成','身分證雜湊'];
+      const FIXED_FRONT=['日期','時間','院區','顧客姓名','身分證遮罩','病歷號','當班醫師','櫃檯人員','護理師','藥師'];
+      const FIXED_BACK=['結帳金額','付款方式','醫師抽成','櫃檯抽成','護理師抽成','藥師抽成','身分證雜湊','備註'];
       const productCols=Object.keys(entry.itemQty||{});
       const allHeaders=[...FIXED_FRONT,...productCols,...FIXED_BACK];
       const row={
