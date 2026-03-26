@@ -1198,29 +1198,57 @@ function renderMemberDiscountBtns(){
     return;
   }
   area.style.display='block';
-  btns.innerHTML=promos.map(p=>`
-    <button id="mdbtn_${p.id}"
+  // 依 memberLabel 合併：同名身份只顯示一顆按鈕，點選後套用所有同名促銷
+  const labelGroups={};
+  promos.forEach(p=>{
+    const label=(p.memberLabel||p.name).trim();
+    if(!labelGroups[label]) labelGroups[label]=[];
+    labelGroups[label].push(p.id);
+  });
+  btns.innerHTML=Object.entries(labelGroups).map(([label,ids])=>`
+    <button id="mdbtn_label_${encodeURIComponent(label)}"
       style="padding:7px 16px;border:1.5px solid #D0DEAD;background:#fff;border-radius:20px;font-family:inherit;font-size:12px;font-weight:600;color:var(--brown);cursor:pointer;transition:all .15s;"
-      onclick="toggleMemberDiscount('${p.id}')">${p.memberLabel||p.name}${p.type==='staffPrice'?'':` (${p.discountValue}折)`}</button>`).join('');
+      onclick="toggleMemberLabel('${label.replace(/'/g,"\\'")}')">
+      ${label}
+    </button>`).join('');
   updateMemberDiscountNote();
 }
 
-function toggleMemberDiscount(id){
-  if(selectedMemberPromoIds.has(id)){
-    selectedMemberPromoIds.delete(id);
-  } else {
-    selectedMemberPromoIds.add(id);
-  }
-  // 更新按鈕樣式
+function toggleMemberLabel(label){
   const promos=getPromos().filter(p=>p.type==='memberDiscount'||p.type==='staffPrice');
+  const ids=promos.filter(p=>(p.memberLabel||p.name).trim()===label).map(p=>p.id);
+  const allSelected=ids.every(id=>selectedMemberPromoIds.has(id));
+
+  // 互斥：先清空所有已選，再決定是否選新的
+  selectedMemberPromoIds.clear();
+  if(!allSelected){
+    // 點新身份 → 選中此身份的所有促銷
+    ids.forEach(id=>selectedMemberPromoIds.add(id));
+  }
+  // 若 allSelected → 點同一個相當於取消，已清空
+
+  // 更新所有按鈕樣式
+  const labelGroups={};
   promos.forEach(p=>{
-    const btn=document.getElementById('mdbtn_'+p.id);
+    const lb=(p.memberLabel||p.name).trim();
+    if(!labelGroups[lb]) labelGroups[lb]=[];
+    labelGroups[lb].push(p.id);
+  });
+  Object.entries(labelGroups).forEach(([lb,gids])=>{
+    const btn=document.getElementById('mdbtn_label_'+encodeURIComponent(lb));
     if(!btn) return;
-    const active=selectedMemberPromoIds.has(p.id);
+    const active=gids.some(id=>selectedMemberPromoIds.has(id));
     btn.style.background=active?'var(--sage)':'#fff';
     btn.style.borderColor=active?'var(--sage)':'#D0DEAD';
     btn.style.color=active?'#fff':'var(--brown)';
   });
+  updateMemberDiscountNote();
+}
+
+function toggleMemberDiscount(id){
+  // 保留向後相容
+  if(selectedMemberPromoIds.has(id)) selectedMemberPromoIds.delete(id);
+  else selectedMemberPromoIds.add(id);
   updateMemberDiscountNote();
 }
 
@@ -1229,12 +1257,10 @@ function updateMemberDiscountNote(){
   if(!note) return;
   if(!selectedMemberPromoIds.size){note.textContent='';return;}
   const promos=getPromos().filter(p=>selectedMemberPromoIds.has(p.id));
-  const labels=promos.map(promo=>{
-    if(promo.type==='staffPrice') return `「${promo.memberLabel||promo.name}」優惠價`;
-    const scopeLabel=(!promo.scope||promo.scope==='all')?'全部':promo.scope;
-    return `「${promo.memberLabel||promo.name}」${scopeLabel} ${promo.discountValue}折`;
-  });
-  note.textContent='✓ 套用：'+labels.join('、');
+  // 依 label 去重，只顯示身份名稱
+  const seenLabels=new Set();
+  promos.forEach(p=>seenLabels.add((p.memberLabel||p.name).trim()));
+  note.textContent='✓ 套用身份：'+[...seenLabels].map(l=>`「${l}」`).join('、');
 }
 function selectMutexRole(role){
   activeMutexRole=role;
