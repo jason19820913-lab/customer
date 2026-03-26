@@ -1424,6 +1424,7 @@ function closeModal(){
     if(inp)inp.value='';if(val)val.value='';
   });
   const remarkEl=document.getElementById('pinRemark');if(remarkEl)remarkEl.value='';
+  selectedMemberPromoIds.clear();
   buildProductUI();renderSidebar();
 }
 
