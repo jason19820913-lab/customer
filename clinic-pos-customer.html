@@ -313,6 +313,17 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
 
     <!-- 步驟B：員工選擇 -->
     <div id="staffStep" style="display:none;">
+      <!-- 備註（在醫師前） -->
+      <div class="form-group" style="margin-bottom:14px;">
+        <label style="font-size:12px;color:var(--brown);font-weight:700;">📋 備註 <span style="color:#aaa;font-weight:400;font-size:11px;">(選填)</span></label>
+        <select class="fg-input" id="pinRemark">
+          <option value="">— 無備註 —</option>
+          <option value="金醫師">金醫師</option>
+          <option value="猛健樂">猛健樂</option>
+          <option value="胰妥讚4週">胰妥讚4週</option>
+          <option value="胰妥讚8週">胰妥讚8週</option>
+        </select>
+      </div>
       <!-- 醫師（非必填，獨立） -->
       <div style="margin-bottom:14px;">
         <div class="form-group">
@@ -364,17 +375,6 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
         <div style="font-size:12px;color:var(--brown);font-weight:700;margin-bottom:8px;">🏷️ 顧客身份 <span style="color:#aaa;font-weight:400;font-size:11px;">(可選，選後自動套用折扣)</span></div>
         <div id="memberDiscountBtns" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
         <div id="memberDiscountNote" style="font-size:11px;color:var(--sage);margin-top:6px;"></div>
-      </div>
-      <!-- 備註 -->
-      <div class="form-group" style="margin-bottom:14px;">
-        <label style="font-size:12px;color:var(--brown);font-weight:700;">📋 備註 <span style="color:#aaa;font-weight:400;font-size:11px;">(選填)</span></label>
-        <select class="fg-input" id="pinRemark">
-          <option value="">— 無備註 —</option>
-          <option value="金醫師">金醫師</option>
-          <option value="猛健樂">猛健樂</option>
-          <option value="胰妥讚4週">胰妥讚4週</option>
-          <option value="胰妥讚8週">胰妥讚8週</option>
-        </select>
       </div>
       <div style="display:flex;gap:8px;">
         <select class="fg-input" id="pinPayMethod" style="flex:1;">
@@ -1311,14 +1311,14 @@ async function doCheckout(){
 
   if(gasUrl()){
     try{
-      const FIXED_FRONT=['日期','時間','院區','顧客姓名','身分證遮罩','病歷號','當班醫師','櫃檯人員','護理師','藥師'];
+      const FIXED_FRONT=['日期','時間','院區','顧客姓名','身分證遮罩','病歷號','備註','當班醫師','櫃檯人員','護理師','藥師'];
       const FIXED_BACK=['結帳金額','付款方式','醫師抽成','櫃檯抽成','護理師抽成','藥師抽成','身分證雜湊','備註'];
       const productCols=Object.keys(entry.itemQty||{});
       const allHeaders=[...FIXED_FRONT,...productCols,...FIXED_BACK];
       const row={
         '日期':entry.date,'時間':entry.time,'院區':entry.clinic,
         '顧客姓名':entry.customer,'身分證遮罩':entry.idMask||'','病歷號':entry.phone||'',
-        '當班醫師':entry.doctor,'櫃檯人員':entry.staff||'','護理師':entry.nurse||'','藥師':entry.pharma||'','備註':entry.remark||'',
+        '備註':entry.remark||'','當班醫師':entry.doctor,'櫃檯人員':entry.staff||'','護理師':entry.nurse||'','藥師':entry.pharma||'',
         '結帳金額':entry.total,'付款方式':entry.payMethod,
         '醫師抽成':entry.doctorComm||0,'櫃檯抽成':entry.staffComm||0,
         '護理師抽成':entry.nurseComm||0,'藥師抽成':entry.pharmaComm||0,'身分證雜湊':entry.idHash||'',
