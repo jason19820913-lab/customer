@@ -755,9 +755,9 @@ function buildItems(memberPromoOverride){
   const promos=getPromos();
   const items=[];
   const discountLines=[];  // 折扣明細（fixedDiscount / percentDiscount）
-  // 身份折扣：從 override 或全域 selectedMemberPromoId 取得
-  const memberPromoId=memberPromoOverride!==undefined?memberPromoOverride:selectedMemberPromoId;
-  const memberPromo=memberPromoId?promos.find(p=>p.id===memberPromoId&&p.type==='memberDiscount'):null;
+  // 身份折扣：從 override 或全域 selectedMemberPromoIds 取得（支援多選）
+  const activeMemberIds=memberPromoOverride!==undefined?(memberPromoOverride?new Set([memberPromoOverride]):new Set()):selectedMemberPromoIds;
+  const memberPromos=promos.filter(p=>activeMemberIds.has(p.id)&&(p.type==='memberDiscount'||p.type==='staffPrice'));
 
   // ── 群組商品（protein / mct）：合計後套用買N送N ──
   ['protein','mct'].forEach(grp=>{
@@ -840,7 +840,7 @@ function buildItems(memberPromoOverride){
   });
 
   // ── 身份折扣（memberDiscount）/ 員工優惠價（staffPrice）──
-  if(memberPromo){
+  memberPromos.forEach(memberPromo=>{
     if(memberPromo.type==='memberDiscount'){
       const pct=Number(memberPromo.discountValue)||100;
       const applicable=items.filter(i=>{
@@ -863,34 +863,34 @@ function buildItems(memberPromoOverride){
     } else if(memberPromo.type==='staffPrice'){
       // 解析 staffPriceMap：每行 "商品名稱=優惠價"
       const priceMap={};
-      (memberPromo.staffPriceMap||'').split(/\n/).forEach(line=>{
+      (memberPromo.staffPriceMap||'').split(/
+/).forEach(line=>{
         const m=line.trim().match(/^(.+?)=([\d.]+)$/);
         if(m) priceMap[m[1].trim()]=Number(m[2]);
       });
-      // 對每個商品計算差額
+      // 直接比對 cart 裡的個別商品（用商品主檔 name/cat 比對）
       let totalDiscount=0;
       const discountDetails=[];
-      items.forEach(i=>{
-        if(i.isDiscount) return;
-        // 嘗試比對商品名稱（支援 "分類-名稱" 或 "名稱"）
-        const shortName=i.name.includes(' x')? i.name.split(' x')[0].trim() : i.name;
-        const staffP=priceMap[shortName]??priceMap[i.name];
+      const allProducts=getProducts().filter(p=>p.active!==false);
+      allProducts.forEach(p=>{
+        const qty=cart[p.id]||0;
+        if(!qty) return;
+        const pName=(p.name||'').trim();
+        const staffP=priceMap[pName];
         if(staffP===undefined) return;
-        // i.price 是整筆金額，算每包差額
-        const qty=parseInt(i.name.match(/x(\d+)/)?.[1])||1;
-        const origUnitPrice=i.price/qty;
-        const diff=Math.round((origUnitPrice-staffP)*qty);
-        if(diff>0){ totalDiscount+=diff; discountDetails.push(`${shortName}×${qty}優惠價NT$${staffP}`);}
+        const origPrice=p.price||0;
+        const diff=Math.round((origPrice-staffP)*qty);
+        if(diff>0){ totalDiscount+=diff; discountDetails.push(`${pName}×${qty} NT$${staffP}/件`);}
       });
       if(totalDiscount>0) discountLines.push({
         emoji:'🏷️',
-        name:`${memberPromo.memberLabel||memberPromo.name} 員工優惠`,
+        name:`${memberPromo.memberLabel||memberPromo.name} 優惠`,
         sub:discountDetails.join('、'),
         price:-totalDiscount,
         isDiscount:true
       });
     }
-  }
+  });
 
   return [...items,...discountLines];
 }
@@ -1127,7 +1127,7 @@ function verifyPin(){
   document.getElementById('pinModalMsg').textContent='請填寫當班人員資訊（可部分填寫）';
   document.getElementById('staffStep').style.display='';
   // 重置員工欄位 + 身份折扣
-  selectedMemberPromoId=null;
+  selectedMemberPromoIds=new Set();
   ['Doctor','Staff','Nurse','Pharma'].forEach(r=>{
     const inp=document.getElementById('staff'+r);
     const val=document.getElementById('staff'+r+'Val');
@@ -1157,7 +1157,7 @@ function verifyPin(){
 
 // Modal 內員工 dropdown
 let activeMutexRole='staff';
-let selectedMemberPromoId=null; // 目前選中的身份折扣
+let selectedMemberPromoIds=new Set(); // 目前選中的身份折扣（可多選）
 
 function renderMemberDiscountBtns(){
   const promos=getPromos().filter(p=>p.type==='memberDiscount'||p.type==='staffPrice');
@@ -1183,13 +1183,13 @@ function renderMemberDiscountBtns(){
   btns.innerHTML=promos.map(p=>`
     <button id="mdbtn_${p.id}"
       style="padding:7px 16px;border:1.5px solid #D0DEAD;background:#fff;border-radius:20px;font-family:inherit;font-size:12px;font-weight:600;color:var(--brown);cursor:pointer;transition:all .15s;"
-      onclick="toggleMemberDiscount('${p.id}')">${p.memberLabel||p.name} (${p.discountValue}折)</button>`).join('');
+      onclick="toggleMemberDiscount('${p.id}')">${p.memberLabel||p.name}${p.type==='staffPrice'?'':` (${p.discountValue}折)`}</button>`).join('');
   updateMemberDiscountNote();
 }
 
 function toggleMemberDiscount(id){
   if(selectedMemberPromoId===id){
-    selectedMemberPromoId=null;
+    selectedMemberPromoIds=new Set();
   } else {
     selectedMemberPromoId=id;
   }
@@ -1209,15 +1209,14 @@ function toggleMemberDiscount(id){
 function updateMemberDiscountNote(){
   const note=document.getElementById('memberDiscountNote');
   if(!note) return;
-  if(!selectedMemberPromoId){note.textContent='';return;}
-  const promo=getPromos().find(p=>p.id===selectedMemberPromoId);
-  if(!promo){note.textContent='';return;}
-  if(promo.type==='staffPrice'){
-    note.textContent=`✓ 套用「${promo.memberLabel||promo.name}」員工優惠價`;
-  } else {
-    const scopeLabel=(!promo.scope||promo.scope==='all')?'全部商品':promo.scope;
-    note.textContent=`✓ 套用「${promo.memberLabel||promo.name}」折扣：${scopeLabel} ${promo.discountValue}折`;
-  }
+  if(!selectedMemberPromoIds.size){note.textContent='';return;}
+  const promos=getPromos().filter(p=>selectedMemberPromoIds.has(p.id));
+  const labels=promos.map(promo=>{
+    if(promo.type==='staffPrice') return `「${promo.memberLabel||promo.name}」優惠價`;
+    const scopeLabel=(!promo.scope||promo.scope==='all')?'全部':promo.scope;
+    return `「${promo.memberLabel||promo.name}」${scopeLabel} ${promo.discountValue}折`;
+  });
+  note.textContent='✓ 套用：'+labels.join('、');
 }
 function selectMutexRole(role){
   activeMutexRole=role;
@@ -1347,7 +1346,7 @@ async function doCheckout(){
   if(gasUrl()){
     try{
       const FIXED_FRONT=['日期','時間','院區','顧客姓名','身分證遮罩','病歷號','備註','當班醫師','櫃檯人員','護理師','藥師'];
-      const FIXED_BACK=['結帳金額','付款方式','醫師抽成','櫃檯抽成','護理師抽成','藥師抽成','身分證雜湊','備註'];
+      const FIXED_BACK=['結帳金額','付款方式','醫師抽成','櫃檯抽成','護理師抽成','藥師抽成','身分證雜湊'];
       const productCols=Object.keys(entry.itemQty||{});
       const allHeaders=[...FIXED_FRONT,...productCols,...FIXED_BACK];
       const row={
