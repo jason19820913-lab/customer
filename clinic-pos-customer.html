@@ -208,7 +208,22 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
 <div id="productLoadingBanner" style="display:none;align-items:center;justify-content:center;gap:8px;background:#E8F2EA;border-bottom:1px solid #C5DEC8;padding:7px 14px;font-size:11px;color:var(--sage);font-weight:600;">
   <span style="animation:spin 1s linear infinite;display:inline-block;">🔄</span> 正在從 Google Sheet 同步最新商品清單...
 </div>
-<style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
+<style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+#_printArea{display:none;}
+@media print{
+  body > *:not(#_printArea){display:none!important;}
+  #_printArea{
+    display:block!important;
+    font-family:'Noto Sans TC',sans-serif;
+    padding:24px 20px;
+    max-width:320px;
+    margin:0 auto;
+    font-size:12px;
+    color:#333;
+  }
+  #_printArea .receipt-row{display:flex;justify-content:space-between;padding:4px 0;}
+  #_printArea #syncStatus{display:none!important;}
+}</style>
 
 <div class="steps-bar">
   <div class="step-item active" id="step1"><div class="step-num">1</div><span class="step-label">輸入資訊</span></div>
@@ -343,6 +358,23 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
             <input type="hidden" id="staffPharmaVal">
           </div>
         </div>
+      </div>
+      <!-- 身份折扣 -->
+      <div id="memberDiscountArea" style="margin-bottom:14px;display:none;">
+        <div style="font-size:12px;color:var(--brown);font-weight:700;margin-bottom:8px;">🏷️ 顧客身份 <span style="color:#aaa;font-weight:400;font-size:11px;">(可選，選後自動套用折扣)</span></div>
+        <div id="memberDiscountBtns" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+        <div id="memberDiscountNote" style="font-size:11px;color:var(--sage);margin-top:6px;"></div>
+      </div>
+      <!-- 備註 -->
+      <div class="form-group" style="margin-bottom:14px;">
+        <label style="font-size:12px;color:var(--brown);font-weight:700;">📋 備註 <span style="color:#aaa;font-weight:400;font-size:11px;">(選填)</span></label>
+        <select class="fg-input" id="pinRemark">
+          <option value="">— 無備註 —</option>
+          <option value="金醫師">金醫師</option>
+          <option value="猛健樂">猛健樂</option>
+          <option value="胰妥讚4週">胰妥讚4週</option>
+          <option value="胰妥讚8週">胰妥讚8週</option>
+        </select>
       </div>
       <div style="display:flex;gap:8px;">
         <select class="fg-input" id="pinPayMethod" style="flex:1;">
@@ -718,11 +750,14 @@ function onStaffChange(){document.getElementById('doctorBadge').textContent=docu
 function onCustomerChange(){renderSidebar();}
 
 /* ── SIDEBAR ── */
-function buildItems(){
+function buildItems(memberPromoOverride){
   const products=getProducts().filter(p=>p.active!==false);
   const promos=getPromos();
   const items=[];
   const discountLines=[];  // 折扣明細（fixedDiscount / percentDiscount）
+  // 身份折扣：從 override 或全域 selectedMemberPromoId 取得
+  const memberPromoId=memberPromoOverride!==undefined?memberPromoOverride:selectedMemberPromoId;
+  const memberPromo=memberPromoId?promos.find(p=>p.id===memberPromoId&&p.type==='memberDiscount'):null;
 
   // ── 群組商品（protein / mct）：合計後套用買N送N ──
   ['protein','mct'].forEach(grp=>{
@@ -803,6 +838,28 @@ function buildItems(){
     if(pm.type==='fixedDiscount')   discount=Math.min(pm.discountValue,base);
     if(discount>0) discountLines.push({emoji:'🏷️',name:pm.name,sub:pm.type==='percentDiscount'?`${pm.discountValue}折`:`折扣 -NT$${discount}`,price:-discount,isDiscount:true});
   });
+
+  // ── 身份折扣（memberDiscount）──
+  if(memberPromo){
+    const pct=Number(memberPromo.discountValue)||100;
+    const applicable=items.filter(i=>{
+      if(i.isDiscount)return false;
+      const scope=String(memberPromo.scope||'');
+      if(!scope||scope==='all') return true;
+      if(scope.startsWith('group:')) return i.group===scope.slice(6);
+      if(scope.startsWith('cat:')) return i.cat===scope.slice(4);
+      return false;
+    });
+    const base=applicable.reduce((s,i)=>s+i.price,0);
+    const discount=Math.round(base*(1-pct/100));
+    if(discount>0) discountLines.push({
+      emoji:'🏷️',
+      name:`${memberPromo.memberLabel||memberPromo.name} 折扣`,
+      sub:`${pct}折`,
+      price:-discount,
+      isDiscount:true
+    });
+  }
 
   return [...items,...discountLines];
 }
@@ -1038,7 +1095,8 @@ function verifyPin(){
   document.getElementById('pinModalTitle').textContent='選擇當班人員';
   document.getElementById('pinModalMsg').textContent='請填寫當班人員資訊（可部分填寫）';
   document.getElementById('staffStep').style.display='';
-  // 重置員工欄位
+  // 重置員工欄位 + 身份折扣
+  selectedMemberPromoId=null;
   ['Doctor','Staff','Nurse','Pharma'].forEach(r=>{
     const inp=document.getElementById('staff'+r);
     const val=document.getElementById('staff'+r+'Val');
@@ -1066,6 +1124,50 @@ function verifyPin(){
 
 // Modal 內員工 dropdown
 let activeMutexRole='staff';
+let selectedMemberPromoId=null; // 目前選中的身份折扣
+
+function renderMemberDiscountBtns(){
+  const promos=getPromos().filter(p=>p.type==='memberDiscount');
+  const area=document.getElementById('memberDiscountArea');
+  const btns=document.getElementById('memberDiscountBtns');
+  if(!area||!btns) return;
+  if(!promos.length){area.style.display='none';return;}
+  area.style.display='block';
+  btns.innerHTML=promos.map(p=>`
+    <button id="mdbtn_${p.id}"
+      style="padding:7px 16px;border:1.5px solid #D0DEAD;background:#fff;border-radius:20px;font-family:inherit;font-size:12px;font-weight:600;color:var(--brown);cursor:pointer;transition:all .15s;"
+      onclick="toggleMemberDiscount('${p.id}')">${p.memberLabel||p.name} (${p.discountValue}折)</button>`).join('');
+  updateMemberDiscountNote();
+}
+
+function toggleMemberDiscount(id){
+  if(selectedMemberPromoId===id){
+    selectedMemberPromoId=null;
+  } else {
+    selectedMemberPromoId=id;
+  }
+  // 更新按鈕樣式
+  const promos=getPromos().filter(p=>p.type==='memberDiscount');
+  promos.forEach(p=>{
+    const btn=document.getElementById('mdbtn_'+p.id);
+    if(!btn) return;
+    const active=selectedMemberPromoId===p.id;
+    btn.style.background=active?'var(--sage)':'#fff';
+    btn.style.borderColor=active?'var(--sage)':'#D0DEAD';
+    btn.style.color=active?'#fff':'var(--brown)';
+  });
+  updateMemberDiscountNote();
+}
+
+function updateMemberDiscountNote(){
+  const note=document.getElementById('memberDiscountNote');
+  if(!note) return;
+  if(!selectedMemberPromoId){note.textContent='';return;}
+  const promo=getPromos().find(p=>p.id===selectedMemberPromoId);
+  if(!promo){note.textContent='';return;}
+  const scopeLabel=(!promo.scope||promo.scope==='all')?'全部商品':promo.scope;
+  note.textContent=`✓ 套用「${promo.memberLabel||promo.name}」折扣：${scopeLabel} ${promo.discountValue}折`;
+}
 function selectMutexRole(role){
   activeMutexRole=role;
   // 清除其他兩個角色的值
@@ -1141,6 +1243,7 @@ async function doCheckout(){
   const customer=document.getElementById('customerName').value.trim();
   const chartNum=document.getElementById('chartNumber').value.trim();
   payMethod=document.getElementById('pinPayMethod').value;
+  const remark=document.getElementById('pinRemark')?.value||'';
   const now=new Date();
   const date=now.toLocaleDateString('zh-TW');
   const time=now.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
@@ -1161,7 +1264,7 @@ async function doCheckout(){
   const hasDoctor=!!doctor, hasStaff=!!staffV, hasNurse=!!nurseV, hasPharma=!!pharmaV;
   const cm=calcComm(itemsStr,hasDoctor,hasStaff,hasNurse,hasPharma);
   const entry={date,time,clinic,customer,phone:chartNum,doctor,staff:staffV,nurse:nurseV,pharma:pharmaV,
-    items:itemsStr,itemQty,total,payMethod,
+    items:itemsStr,itemQty,total,payMethod,remark,
     doctorComm:cm.dr,staffComm:cm.st,nurseComm:cm.nu,pharmaComm:cm.ph,idHash:'',idMask:''};
 
   const log=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
@@ -1192,14 +1295,14 @@ async function doCheckout(){
 
   if(gasUrl()){
     try{
-      const FIXED_FRONT=['日期','時間','院區','顧客姓名','身分證遮罩','病歷號','當班醫師','櫃檯人員','護理師','藥師'];
+      const FIXED_FRONT=['日期','時間','院區','顧客姓名','身分證遮罩','病歷號','當班醫師','櫃檯人員','護理師','藥師','備註'];
       const FIXED_BACK=['結帳金額','付款方式','醫師抽成','櫃檯抽成','護理師抽成','藥師抽成','身分證雜湊'];
       const productCols=Object.keys(entry.itemQty||{});
       const allHeaders=[...FIXED_FRONT,...productCols,...FIXED_BACK];
       const row={
         '日期':entry.date,'時間':entry.time,'院區':entry.clinic,
         '顧客姓名':entry.customer,'身分證遮罩':entry.idMask||'','病歷號':entry.phone||'',
-        '當班醫師':entry.doctor,'櫃檯人員':entry.staff||'','護理師':entry.nurse||'','藥師':entry.pharma||'',
+        '當班醫師':entry.doctor,'櫃檯人員':entry.staff||'','護理師':entry.nurse||'','藥師':entry.pharma||'','備註':entry.remark||'',
         '結帳金額':entry.total,'付款方式':entry.payMethod,
         '醫師抽成':entry.doctorComm||0,'櫃檯抽成':entry.staffComm||0,
         '護理師抽成':entry.nurseComm||0,'藥師抽成':entry.pharmaComm||0,'身分證雜湊':entry.idHash||'',
@@ -1226,42 +1329,36 @@ function closeModal(){
     const inp=document.getElementById('staff'+r);const val=document.getElementById('staff'+r+'Val');
     if(inp)inp.value='';if(val)val.value='';
   });
+  const remarkEl=document.getElementById('pinRemark');if(remarkEl)remarkEl.value='';
   buildProductUI();renderSidebar();
 }
 
 function printReceipt(){
-  // 只取收據主體內容（排除 syncStatus 同步狀態列）
   const msg=document.getElementById('modalMsg')?.textContent||'';
   const receipt=document.getElementById('modalReceipt');
-  // 複製 receipt 內容並移除 syncStatus
   const clone=receipt.cloneNode(true);
   const sync=clone.querySelector('#syncStatus');
   if(sync) sync.remove();
 
-  const win=window.open('','_blank','width=420,height=680');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-    <title>擇木良食藥局收據</title>
-    <style>
-      *{box-sizing:border-box;}
-      body{font-family:'Noto Sans TC',sans-serif;padding:24px 20px;max-width:320px;margin:0 auto;font-size:12px;color:#333;}
-      .receipt-row{display:flex;justify-content:space-between;padding:4px 0;}
-      hr{border:none;border-top:1px dashed #ccc;margin:10px 0;}
-      @media print{.no-print{display:none!important;}}
-    </style>
-  </head><body>
+  // 建立列印用的隱藏 div（相容 iPad Safari，不用 window.open）
+  let printDiv=document.getElementById('_printArea');
+  if(!printDiv){
+    printDiv=document.createElement('div');
+    printDiv.id='_printArea';
+    document.body.appendChild(printDiv);
+  }
+  printDiv.innerHTML=`
     <div style="text-align:center;margin-bottom:12px;">
       <div style="font-size:20px;font-weight:900;color:#2d4a31;">擇木良食藥局</div>
       <div style="font-size:11px;color:#888;margin-top:3px;">健康銷售收據</div>
     </div>
-    <hr>
+    <hr style="border:none;border-top:1px dashed #ccc;margin:10px 0;">
     <p style="text-align:center;font-weight:700;margin:8px 0;">${msg}</p>
     ${clone.innerHTML}
-    <hr>
-    <div style="text-align:center;color:#aaa;font-size:10px;margin-top:8px;">感謝您的購買，祝您身體健康 🌿</div>
-    <br>
-    <button class="no-print" onclick="window.print()" style="width:100%;padding:10px;background:#6B8F71;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;">🖨️ 列印</button>
-  </body></html>`);
-  win.document.close();
+    <hr style="border:none;border-top:1px dashed #ccc;margin:10px 0;">
+    <div style="text-align:center;color:#aaa;font-size:10px;margin-top:8px;">感謝您的購買，祝您身體健康 🌿</div>`;
+
+  window.print();
 }
 
 function toast(msg){
