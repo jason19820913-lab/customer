@@ -839,26 +839,57 @@ function buildItems(memberPromoOverride){
     if(discount>0) discountLines.push({emoji:'🏷️',name:pm.name,sub:pm.type==='percentDiscount'?`${pm.discountValue}折`:`折扣 -NT$${discount}`,price:-discount,isDiscount:true});
   });
 
-  // ── 身份折扣（memberDiscount）──
+  // ── 身份折扣（memberDiscount）/ 員工優惠價（staffPrice）──
   if(memberPromo){
-    const pct=Number(memberPromo.discountValue)||100;
-    const applicable=items.filter(i=>{
-      if(i.isDiscount)return false;
-      const scope=String(memberPromo.scope||'');
-      if(!scope||scope==='all') return true;
-      if(scope.startsWith('group:')) return i.group===scope.slice(6);
-      if(scope.startsWith('cat:')) return i.cat===scope.slice(4);
-      return false;
-    });
-    const base=applicable.reduce((s,i)=>s+i.price,0);
-    const discount=Math.round(base*(1-pct/100));
-    if(discount>0) discountLines.push({
-      emoji:'🏷️',
-      name:`${memberPromo.memberLabel||memberPromo.name} 折扣`,
-      sub:`${pct}折`,
-      price:-discount,
-      isDiscount:true
-    });
+    if(memberPromo.type==='memberDiscount'){
+      const pct=Number(memberPromo.discountValue)||100;
+      const applicable=items.filter(i=>{
+        if(i.isDiscount)return false;
+        const scope=String(memberPromo.scope||'');
+        if(!scope||scope==='all') return true;
+        if(scope.startsWith('group:')) return i.group===scope.slice(6);
+        if(scope.startsWith('cat:')) return i.cat===scope.slice(4);
+        return false;
+      });
+      const base=applicable.reduce((s,i)=>s+i.price,0);
+      const discount=Math.round(base*(1-pct/100));
+      if(discount>0) discountLines.push({
+        emoji:'🏷️',
+        name:`${memberPromo.memberLabel||memberPromo.name} 折扣`,
+        sub:`${pct}折`,
+        price:-discount,
+        isDiscount:true
+      });
+    } else if(memberPromo.type==='staffPrice'){
+      // 解析 staffPriceMap：每行 "商品名稱=優惠價"
+      const priceMap={};
+      (memberPromo.staffPriceMap||'').split(/\n/).forEach(line=>{
+        const m=line.trim().match(/^(.+?)=([\d.]+)$/);
+        if(m) priceMap[m[1].trim()]=Number(m[2]);
+      });
+      // 對每個商品計算差額
+      let totalDiscount=0;
+      const discountDetails=[];
+      items.forEach(i=>{
+        if(i.isDiscount) return;
+        // 嘗試比對商品名稱（支援 "分類-名稱" 或 "名稱"）
+        const shortName=i.name.includes(' x')? i.name.split(' x')[0].trim() : i.name;
+        const staffP=priceMap[shortName]??priceMap[i.name];
+        if(staffP===undefined) return;
+        // i.price 是整筆金額，算每包差額
+        const qty=parseInt(i.name.match(/x(\d+)/)?.[1])||1;
+        const origUnitPrice=i.price/qty;
+        const diff=Math.round((origUnitPrice-staffP)*qty);
+        if(diff>0){ totalDiscount+=diff; discountDetails.push(`${shortName}×${qty}優惠價NT$${staffP}`);}
+      });
+      if(totalDiscount>0) discountLines.push({
+        emoji:'🏷️',
+        name:`${memberPromo.memberLabel||memberPromo.name} 員工優惠`,
+        sub:discountDetails.join('、'),
+        price:-totalDiscount,
+        isDiscount:true
+      });
+    }
   }
 
   return [...items,...discountLines];
@@ -1129,7 +1160,7 @@ let activeMutexRole='staff';
 let selectedMemberPromoId=null; // 目前選中的身份折扣
 
 function renderMemberDiscountBtns(){
-  const promos=getPromos().filter(p=>p.type==='memberDiscount');
+  const promos=getPromos().filter(p=>p.type==='memberDiscount'||p.type==='staffPrice');
   const area=document.getElementById('memberDiscountArea');
   const btns=document.getElementById('memberDiscountBtns');
   if(!area||!btns) return;
@@ -1163,7 +1194,7 @@ function toggleMemberDiscount(id){
     selectedMemberPromoId=id;
   }
   // 更新按鈕樣式
-  const promos=getPromos().filter(p=>p.type==='memberDiscount');
+  const promos=getPromos().filter(p=>p.type==='memberDiscount'||p.type==='staffPrice');
   promos.forEach(p=>{
     const btn=document.getElementById('mdbtn_'+p.id);
     if(!btn) return;
@@ -1181,8 +1212,12 @@ function updateMemberDiscountNote(){
   if(!selectedMemberPromoId){note.textContent='';return;}
   const promo=getPromos().find(p=>p.id===selectedMemberPromoId);
   if(!promo){note.textContent='';return;}
-  const scopeLabel=(!promo.scope||promo.scope==='all')?'全部商品':promo.scope;
-  note.textContent=`✓ 套用「${promo.memberLabel||promo.name}」折扣：${scopeLabel} ${promo.discountValue}折`;
+  if(promo.type==='staffPrice'){
+    note.textContent=`✓ 套用「${promo.memberLabel||promo.name}」員工優惠價`;
+  } else {
+    const scopeLabel=(!promo.scope||promo.scope==='all')?'全部商品':promo.scope;
+    note.textContent=`✓ 套用「${promo.memberLabel||promo.name}」折扣：${scopeLabel} ${promo.discountValue}折`;
+  }
 }
 function selectMutexRole(role){
   activeMutexRole=role;
