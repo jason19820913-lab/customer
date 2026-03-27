@@ -524,7 +524,8 @@ document.addEventListener('DOMContentLoaded', async ()=>{
           buyQty:Number(r.buyQty)||0,
           freeQty:Number(r.freeQty)||0,
           discountValue:Number(r.discountValue)||0,
-          active:String(r.active).toUpperCase()!=='FALSE'
+          active:String(r.active).toUpperCase()!=='FALSE',
+          noComm:String(r.noComm).toUpperCase()==='TRUE'
         }));
         localStorage.setItem(PROMO_KEY, JSON.stringify(promos));
         console.info('[promos] 已同步促銷活動，共', promos.length, '項');
@@ -1356,7 +1357,10 @@ async function doCheckout(){
   });
 
   const hasDoctor=!!doctor, hasStaff=!!staffV, hasNurse=!!nurseV, hasPharma=!!pharmaV;
-  const cm=calcComm(itemsStr,hasDoctor,hasStaff,hasNurse,hasPharma);
+  // 如果選了「不計分潤」身份，分潤全部歸零
+  const activePromos=getPromos().filter(p=>selectedMemberPromoIds.has(p.id));
+  const isNoComm=activePromos.some(p=>p.noComm===true||p.noComm==='TRUE');
+  const cm=isNoComm?{dr:0,st:0,nu:0,ph:0}:calcComm(itemsStr,hasDoctor,hasStaff,hasNurse,hasPharma);
   const entry={date,time,clinic,customer,phone:chartNum,doctor,staff:staffV,nurse:nurseV,pharma:pharmaV,
     items:itemsStr,itemQty,total,payMethod,remark,
     doctorComm:cm.dr,staffComm:cm.st,nurseComm:cm.nu,pharmaComm:cm.ph,idHash:'',idMask:''};
