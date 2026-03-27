@@ -1244,6 +1244,33 @@ function toggleMemberLabel(label){
     btn.style.color=active?'#fff':'var(--brown)';
   });
   updateMemberDiscountNote();
+  updateDoctorFieldLock();
+}
+
+function updateDoctorFieldLock(){
+  const activePromos=getPromos().filter(p=>selectedMemberPromoIds.has(p.id));
+  const isNoComm=activePromos.some(p=>p.noComm===true||p.noComm==='TRUE');
+  const doctorInp=document.getElementById('staffDoctor');
+  const doctorVal=document.getElementById('staffDoctorVal');
+  const doctorDd=document.getElementById('modalDoctorDd');
+  const doctorArea=doctorInp?.closest('.form-group')?.parentElement||doctorInp?.closest('div[style]');
+  if(!doctorInp) return;
+  if(isNoComm){
+    // 鎖定：清空並 disable
+    doctorInp.value='';
+    if(doctorVal) doctorVal.value='';
+    if(doctorDd) doctorDd.style.display='none';
+    doctorInp.disabled=true;
+    doctorInp.placeholder='此身份不計醫師抽成';
+    doctorInp.style.opacity='0.4';
+    doctorInp.style.cursor='not-allowed';
+  } else {
+    // 解鎖
+    doctorInp.disabled=false;
+    doctorInp.placeholder='搜尋醫師...';
+    doctorInp.style.opacity='';
+    doctorInp.style.cursor='';
+  }
 }
 
 function toggleMemberDiscount(id){
