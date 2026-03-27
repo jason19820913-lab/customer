@@ -226,6 +226,23 @@ tbody tr:hover td{background:var(--sage-pale);}
 <body>
 <div class="toast-wrap" id="toastWrap"></div>
 
+<!-- 管理密碼驗證 Modal -->
+<div class="modal-overlay" id="mgmtPinModal" style="z-index:500;display:none;">
+  <div style="background:#fff;border-radius:18px;padding:28px 24px;width:100%;max-width:340px;box-shadow:0 20px 60px rgba(0,0,0,.25);text-align:center;">
+    <div style="font-size:32px;margin-bottom:8px;">🔒</div>
+    <h3 style="margin:0 0 6px;font-size:16px;color:var(--charcoal);">管理員驗證</h3>
+    <p style="font-size:12px;color:#888;margin-bottom:16px;">請輸入管理密碼以進入此頁面</p>
+    <input type="password" id="mgmtPinInput"
+      style="width:100%;padding:10px;border:1.5px solid #D0DEAD;border-radius:10px;font-size:18px;letter-spacing:6px;text-align:center;font-family:inherit;margin-bottom:8px;box-sizing:border-box;"
+      placeholder="管理密碼" onkeydown="if(event.key==='Enter')verifyMgmtPin()">
+    <div id="mgmtPinError" style="color:#c62828;font-size:11px;min-height:16px;margin-bottom:8px;"></div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="closeMgmtPinModal()" style="flex:1;padding:10px;border:1.5px solid #ddd;border-radius:10px;background:#fff;font-family:inherit;font-size:13px;cursor:pointer;color:#888;">取消</button>
+      <button onclick="verifyMgmtPin()" style="flex:2;padding:10px;border:none;border-radius:10px;background:var(--sage);color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">確認</button>
+    </div>
+  </div>
+</div>
+
 <!-- LOGIN -->
 <div class="login-screen" id="loginScreen">
   <div class="login-box">
@@ -272,10 +289,10 @@ tbody tr:hover td{background:var(--sage-pale);}
   <div class="nav-bar">
     <div class="nav-tab active" onclick="switchPage('stats')"  id="navStats">📊 銷售統計</div>
     <div class="nav-tab"        onclick="switchPage('patient')" id="navPatient">🪪 顧客查詢</div>
-    <div class="nav-tab"        onclick="switchPage('products')" id="navProducts">🛍️ 商品管理</div>
-    <div class="nav-tab"        onclick="switchPage('promos')"   id="navPromos">🏷️ 促銷活動</div>
-    <div class="nav-tab"        onclick="switchPage('comm')"     id="navComm">💰 分潤設定</div>
-    <div class="nav-tab"        onclick="switchPage('settings')" id="navSettings">⚙️ 系統設定</div>
+    <div class="nav-tab"        onclick="requireMgmtPin('products')" id="navProducts">🛍️ 商品管理 🔒</div>
+    <div class="nav-tab"        onclick="requireMgmtPin('promos')"   id="navPromos">🏷️ 促銷活動 🔒</div>
+    <div class="nav-tab"        onclick="requireMgmtPin('comm')"     id="navComm">💰 分潤設定 🔒</div>
+    <div class="nav-tab"        onclick="requireMgmtPin('settings')" id="navSettings">⚙️ 系統設定 🔒</div>
   </div>
 
   <!-- ── STATS PAGE ── -->
@@ -712,7 +729,7 @@ function json(o) {
 
 <script>
 // ── KEYS ──
-const SALES_KEY='clinicSalesLog',GS_KEY='gsUrl',PIN_KEY='adminPin',STAFF_KEY='clinicStaff',PRODUCTS_KEY='clinicProducts',CLINIC_KEY='clinicClinics',PROMO_KEY='clinicPromos',COMM_KEY='clinicCommRules';
+const SALES_KEY='clinicSalesLog',GS_KEY='gsUrl',PIN_KEY='adminPin',MGMT_PIN_KEY='mgmtPin',STAFF_KEY='clinicStaff',PRODUCTS_KEY='clinicProducts',CLINIC_KEY='clinicClinics',PROMO_KEY='clinicPromos',COMM_KEY='clinicCommRules';
 const DEFAULT_PIN='1234';
 
 // ── DEFAULT PRODUCTS ──
@@ -857,6 +874,44 @@ async function initApp(){
   }
 }
 function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+function getMgmtPin(){return localStorage.getItem(MGMT_PIN_KEY)||'1234';}
+let mgmtPinTarget=null;
+let mgmtPinVerified=false; // 本次登入是否已驗證管理密碼
+
+function requireMgmtPin(page){
+  // 已驗證過本次 session 就直接切換
+  if(mgmtPinVerified){ switchPage(page); return; }
+  mgmtPinTarget=page;
+  document.getElementById('mgmtPinInput').value='';
+  document.getElementById('mgmtPinError').textContent='';
+  document.getElementById('mgmtPinModal').style.display='flex';
+  setTimeout(()=>document.getElementById('mgmtPinInput').focus(),100);
+}
+
+function verifyMgmtPin(){
+  const entered=document.getElementById('mgmtPinInput').value;
+  if(entered===getMgmtPin()){
+    mgmtPinVerified=true;
+    document.getElementById('mgmtPinModal').style.display='none';
+    if(mgmtPinTarget) switchPage(mgmtPinTarget);
+    mgmtPinTarget=null;
+  } else {
+    document.getElementById('mgmtPinError').textContent='❌ 密碼錯誤，請重試';
+    document.getElementById('mgmtPinInput').value='';
+    document.getElementById('mgmtPinInput').focus();
+  }
+}
+
+function closeMgmtPinModal(){
+  document.getElementById('mgmtPinModal').style.display='none';
+  mgmtPinTarget=null;
+}
+
+// 切換到銷售統計或顧客查詢時，重置管理密碼驗證狀態（保護措施）
+function resetMgmtSession(){
+  mgmtPinVerified=false;
+}
+
 function switchPage(p){
   ['stats','patient','products','promos','comm','settings'].forEach(n=>{
     document.getElementById('page'+cap(n)).classList.toggle('active',n===p);
@@ -865,6 +920,8 @@ function switchPage(p){
   if(p==='patient')connectAdminReader();
   if(p==='promos')renderPromoList();
   if(p==='comm')renderCommPage();
+  // 切回一般頁面時重置管理驗證
+  if(p==='stats'||p==='patient') mgmtPinVerified=false;
 }
 
 // ── STATS ──
