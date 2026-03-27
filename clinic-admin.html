@@ -1713,7 +1713,7 @@ function savePmModal(){
 /* ══════════════════════════════════════════
    促銷活動管理
    ══════════════════════════════════════════ */
-const PROMO_HEADERS=['id','name','type','scope','buyQty','freeQty','discountValue','active','startDate','endDate','memberLabel','staffPriceMap','noComm'];
+const PROMO_HEADERS=['id','name','type','scope','buyQty','freeQty','discountValue','active','startDate','endDate','memberLabel','staffPriceMap','noComm','noCommDoctor'];
 const PROMO_TYPE_LABEL={buyNgetN:'🎁 買N送N',fixedDiscount:'💰 固定折扣',percentDiscount:'📉 百分比折',bundle:'📦 套組定價',memberDiscount:'👤 身份折扣',staffPrice:'🏷️ 員工優惠價'};
 
 let editPromos=[];
@@ -1788,7 +1788,8 @@ function savePromos(){
     startDate:p.startDate||'',endDate:p.endDate||'',
     memberLabel:p.memberLabel||'',
     staffPriceMap:p.staffPriceMap||'',
-    noComm:p.noComm?'TRUE':'FALSE'
+    noComm:p.noComm?'TRUE':'FALSE',
+    noCommDoctor:p.noCommDoctor?'TRUE':'FALSE'
   }));
   gasWrite('促銷活動',PROMO_HEADERS,rows)
     .then(d=>d.status==='ok'?toast('☁️ 促銷活動已同步至 Google Sheet'):toast('⚠️ 同步失敗：'+d.msg))
@@ -1868,7 +1869,11 @@ function promoTypeChanged(){
       <div class="form-group"><label style="font-size:11px;font-weight:700;">折後百分比（九折填90）</label><input class="fg-input" type="number" id="pm_discountValue" value="${p.discountValue||90}" min="1" max="99"></div>
       <div class="form-group" style="grid-column:1/-1;display:flex;align-items:center;gap:8px;">
         <input type="checkbox" id="pm_noComm" ${p.noComm?'checked':''} style="width:16px;height:16px;cursor:pointer;">
-        <label for="pm_noComm" style="font-size:12px;cursor:pointer;">選擇此身份時<strong>不計分潤</strong>（適用員工購買等情況）</label>
+        <label for="pm_noComm" style="font-size:12px;cursor:pointer;">選擇此身份時<strong>不計分潤</strong>（員工購買）</label>
+      </div>
+      <div class="form-group" style="grid-column:1/-1;display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="pm_noCommDoctor" ${p.noCommDoctor?'checked':''} style="width:16px;height:16px;cursor:pointer;">
+        <label for="pm_noCommDoctor" style="font-size:12px;cursor:pointer;">選擇此身份時<strong>醫師欄位強制空白</strong>（套組回診等）</label>
       </div>`;
   } else if(type==='staffPrice'){
     // 員工優惠價：多筆商品→固定售價，用換行分隔
@@ -1886,7 +1891,11 @@ function promoTypeChanged(){
       </div>
       <div class="form-group" style="grid-column:1/-1;display:flex;align-items:center;gap:8px;">
         <input type="checkbox" id="pm_noComm" ${p.noComm?'checked':''} style="width:16px;height:16px;cursor:pointer;">
-        <label for="pm_noComm" style="font-size:12px;cursor:pointer;">選擇此身份時<strong>不計分潤</strong>（適用員工購買等情況）</label>
+        <label for="pm_noComm" style="font-size:12px;cursor:pointer;">選擇此身份時<strong>不計分潤</strong>（員工購買）</label>
+      </div>
+      <div class="form-group" style="grid-column:1/-1;display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="pm_noCommDoctor" ${p.noCommDoctor?'checked':''} style="width:16px;height:16px;cursor:pointer;">
+        <label for="pm_noCommDoctor" style="font-size:12px;cursor:pointer;">選擇此身份時<strong>醫師欄位強制空白</strong>（套組回診等）</label>
       </div>`;
   } else { extra.innerHTML=''; }
 }
@@ -1901,11 +1910,12 @@ function savePromoModal(){
   const memberLabel=document.getElementById('pm_memberLabel')?.value.trim()||'';
   const staffPriceMap=document.getElementById('pm_staffPriceMap')?.value.trim()||'';
   const noComm=document.getElementById('pm_noComm')?.checked||false;
+  const noCommDoctor=document.getElementById('pm_noCommDoctor')?.checked||false;
   const promo={
     id: editingPromoIdx>=0 ? editPromos[editingPromoIdx].id : 'promo_'+Date.now(),
     name, type,
     scope: document.getElementById('pm_scope').value.trim()||'all',
-    buyQty, freeQty, discountValue, memberLabel, staffPriceMap, noComm,
+    buyQty, freeQty, discountValue, memberLabel, staffPriceMap, noComm, noCommDoctor,
     active: document.getElementById('pm_active').value,
     startDate: document.getElementById('pm_startDate').value,
     endDate:   document.getElementById('pm_endDate').value,
