@@ -525,7 +525,8 @@ document.addEventListener('DOMContentLoaded', async ()=>{
           freeQty:Number(r.freeQty)||0,
           discountValue:Number(r.discountValue)||0,
           active:String(r.active).toUpperCase()!=='FALSE',
-          noComm:String(r.noComm).toUpperCase()==='TRUE'
+          noComm:String(r.noComm).toUpperCase()==='TRUE',
+          noCommDoctor:String(r.noCommDoctor).toUpperCase()==='TRUE'
         }));
         localStorage.setItem(PROMO_KEY, JSON.stringify(promos));
         console.info('[promos] 已同步促銷活動，共', promos.length, '項');
@@ -1250,12 +1251,13 @@ function toggleMemberLabel(label){
 function updateDoctorFieldLock(){
   const activePromos=getPromos().filter(p=>selectedMemberPromoIds.has(p.id));
   const isNoComm=activePromos.some(p=>p.noComm===true||p.noComm==='TRUE');
+  const isNoCommDoctor=activePromos.some(p=>p.noCommDoctor===true||p.noCommDoctor==='TRUE');
   const doctorInp=document.getElementById('staffDoctor');
   const doctorVal=document.getElementById('staffDoctorVal');
   const doctorDd=document.getElementById('modalDoctorDd');
   const doctorArea=doctorInp?.closest('.form-group')?.parentElement||doctorInp?.closest('div[style]');
   if(!doctorInp) return;
-  if(isNoComm){
+  if(isNoComm||isNoCommDoctor){
     // 鎖定：清空並 disable
     doctorInp.value='';
     if(doctorVal) doctorVal.value='';
@@ -1387,7 +1389,16 @@ async function doCheckout(){
   // 如果選了「不計分潤」身份，分潤全部歸零
   const activePromos=getPromos().filter(p=>selectedMemberPromoIds.has(p.id));
   const isNoComm=activePromos.some(p=>p.noComm===true||p.noComm==='TRUE');
-  const cm=isNoComm?{dr:0,st:0,nu:0,ph:0}:calcComm(itemsStr,hasDoctor,hasStaff,hasNurse,hasPharma);
+  const isNoCommDoctor=activePromos.some(p=>p.noCommDoctor===true||p.noCommDoctor==='TRUE');
+  let cm;
+  if(isNoComm){
+    cm={dr:0,st:0,nu:0,ph:0};
+  } else if(isNoCommDoctor){
+    const raw=calcComm(itemsStr,false,hasStaff,hasNurse,hasPharma); // 醫師傳 false
+    cm={dr:0,st:raw.st,nu:raw.nu,ph:raw.ph};
+  } else {
+    cm=calcComm(itemsStr,hasDoctor,hasStaff,hasNurse,hasPharma);
+  }
   const entry={date,time,clinic,customer,phone:chartNum,doctor,staff:staffV,nurse:nurseV,pharma:pharmaV,
     items:itemsStr,itemQty,total,payMethod,remark,
     doctorComm:cm.dr,staffComm:cm.st,nurseComm:cm.nu,pharmaComm:cm.ph,idHash:'',idMask:''};
