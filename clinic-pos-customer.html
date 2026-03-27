@@ -887,18 +887,44 @@ function buildItems(memberPromoOverride){
       let totalDiscount=0;
       const discountDetails=[];
       const allProducts=getProducts().filter(p=>p.active!==false);
-      allProducts.forEach(p=>{
-        const qty=cart[p.id]||0;
-        if(!qty) return;
-        const pName=(p.name||'').trim();
-        // 優先查 priceMap 名稱，其次看是否在 scope 內用 defaultPrice
-        let staffP=priceMap[pName];
-        if(staffP===undefined && defaultPrice!==null && inScope(p)) staffP=defaultPrice;
-        if(staffP===undefined) return;
-        const origPrice=p.price||0;
-        const diff=Math.round((origPrice-staffP)*qty);
-        if(diff>0){ totalDiscount+=diff; discountDetails.push(`${pName}×${qty} NT$${staffP}/件`);}
-      });
+
+      if(defaultPrice===0){
+        // 優惠價為 0：折扣 = scope 範圍內商品在 items 中的實際結帳金額（已含買6送1等優惠）
+        let scopeActual=0;
+        const scopeItemNames=[];
+        items.forEach(i=>{
+          if(i.isDiscount) return;
+          const grp=i.group||'', iCat=i.cat||'';
+          let match=false;
+          if(!scope||scope==='all') match=true;
+          else if(scope.startsWith('group:')&&grp===scope.slice(6)) match=true;
+          else if(scope.startsWith('cat:')&&iCat===scope.slice(4)) match=true;
+          if(match){ scopeActual+=i.price; }
+        });
+        // 同時收集個別商品名稱用於顯示
+        allProducts.forEach(p=>{
+          const qty=cart[p.id]||0;
+          if(!qty||!inScope(p)) return;
+          scopeItemNames.push(`${(p.name||'').trim()}×${qty}`);
+        });
+        if(scopeActual>0){
+          totalDiscount=scopeActual;
+          discountDetails.push(scopeItemNames.join('、')+' NT$0/件');
+        }
+      } else {
+        allProducts.forEach(p=>{
+          const qty=cart[p.id]||0;
+          if(!qty) return;
+          const pName=(p.name||'').trim();
+          let staffP=priceMap[pName];
+          if(staffP===undefined && defaultPrice!==null && inScope(p)) staffP=defaultPrice;
+          if(staffP===undefined) return;
+          const origPrice=p.price||0;
+          const diff=Math.round((origPrice-staffP)*qty);
+          if(diff>0){ totalDiscount+=diff; discountDetails.push(`${pName}×${qty} NT$${staffP}/件`);}
+        });
+      }
+
       if(totalDiscount>0) discountLines.push({
         emoji:'🏷️',
         name:`${memberPromo.memberLabel||memberPromo.name} 優惠`,
