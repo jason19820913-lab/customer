@@ -211,17 +211,76 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
 <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 #_printArea{display:none;}
 @media print{
+  @page{
+    size: 58mm auto;
+    margin: 0;
+  }
   body > *:not(#_printArea){display:none!important;}
   #_printArea{
     display:block!important;
-    font-family:'Noto Sans TC',sans-serif;
-    padding:24px 20px;
-    max-width:320px;
-    margin:0 auto;
-    font-size:12px;
-    color:#333;
+    font-family:'Noto Sans TC','Microsoft JhengHei',sans-serif;
+    width:58mm;
+    padding:3mm 3mm;
+    margin:0;
+    font-size:11pt;
+    color:#000;
+    line-height:1.5;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
   }
-  #_printArea .receipt-row{display:flex;justify-content:space-between;padding:4px 0;}
+  #_printArea .receipt-title{
+    text-align:center;
+    font-size:15pt;
+    font-weight:900;
+    letter-spacing:1px;
+    margin-bottom:1mm;
+  }
+  #_printArea .receipt-subtitle{
+    text-align:center;
+    font-size:9pt;
+    color:#555;
+    margin-bottom:2mm;
+  }
+  #_printArea .receipt-divider{
+    border:none;
+    border-top:1px dashed #000;
+    margin:2mm 0;
+  }
+  #_printArea .receipt-row{
+    display:flex;
+    justify-content:space-between;
+    padding:1mm 0;
+    font-size:11pt;
+    line-height:1.4;
+  }
+  #_printArea .receipt-row.total{
+    font-size:14pt;
+    font-weight:900;
+    border-top:1px solid #000;
+    padding-top:2mm;
+    margin-top:1mm;
+  }
+  #_printArea .receipt-item-name{
+    font-size:11pt;
+    font-weight:700;
+  }
+  #_printArea .receipt-item-sub{
+    font-size:9pt;
+    color:#444;
+    padding-left:2mm;
+    line-height:1.4;
+  }
+  #_printArea .receipt-discount{
+    font-size:10pt;
+    color:#000;
+  }
+  #_printArea .receipt-footer{
+    text-align:center;
+    font-size:9pt;
+    color:#555;
+    margin-top:3mm;
+    line-height:1.6;
+  }
   #_printArea #syncStatus{display:none!important;}
 }</style>
 
@@ -1436,20 +1495,23 @@ async function doCheckout(){
   // 關閉密碼 modal，開結帳完成 modal
   document.getElementById('pinModal').classList.remove('open');
 
-  // 建收據
-  const itemRows=items.map(it=>`
-    <div class="receipt-row">
-      <span>${it.emoji||''} ${it.name}</span>
-      <span>NT$${it.price.toLocaleString()}</span>
-    </div>
-    <div style="font-size:10px;color:#aaa;padding:0 4px 4px 24px;">${it.sub||''}</div>`).join('');
+  // 建收據（58mm 熱感應紙優化）
+  const itemRows=items.map(it=>{
+    const isDiscount=it.price<0;
+    return `<div class="receipt-row${isDiscount?' receipt-discount':''}">
+      <span class="receipt-item-name">${it.name}</span>
+      <span>${isDiscount?'-':''}NT$${Math.abs(it.price).toLocaleString()}</span>
+    </div>${it.sub?`<div class="receipt-item-sub">${it.sub}</div>`:''}`;
+  }).join('');
+  const staffLine=[doctor,staffV,nurseV,pharmaV].filter(Boolean).join('・');
   document.getElementById('modalMsg').textContent=`感謝 ${customer} 的購買！`;
   document.getElementById('modalReceipt').innerHTML=`
-    <div style="font-size:10px;color:#888;margin-bottom:8px;">${clinic} ｜ ${date} ${time}</div>
+    <div style="font-size:10px;color:#888;margin-bottom:8px;">${clinic} ｜ ${date} ${time}${staffLine?'<br>服務人員：'+staffLine:''}</div>
     ${itemRows}
     <div style="border-top:1px dashed #ccc;margin:8px 0;"></div>
-    <div class="receipt-row"><span>付款方式</span><span>${payMethod==='cash'?'💵 現金':'🏦 轉帳'}</span></div>
-    <div class="receipt-row" style="font-weight:900;font-size:14px;"><span>結帳總額</span><span style="color:var(--sage);">NT$${total.toLocaleString()}</span></div>
+    \${remark?`<div class="receipt-row"><span>備註</span><span>${remark}</span></div>`:''}
+    <div class="receipt-row"><span>付款方式</span><span>${payMethod==='cash'?'現金':'轉帳'}</span></div>
+    <div class="receipt-row" style="font-weight:900;font-size:14px;border-top:1px solid #ccc;margin-top:6px;padding-top:6px;"><span>結帳總額</span><span style="color:#000;">NT$${total.toLocaleString()}</span></div>
     <div id="syncStatus" style="margin-top:8px;text-align:center;font-size:10px;color:#aaa;">📡 同步中...</div>`;
   document.getElementById('modal').classList.add('open');
   closeDrawer();
@@ -1503,7 +1565,6 @@ function printReceipt(){
   const sync=clone.querySelector('#syncStatus');
   if(sync) sync.remove();
 
-  // 建立列印用的隱藏 div（相容 iPad Safari，不用 window.open）
   let printDiv=document.getElementById('_printArea');
   if(!printDiv){
     printDiv=document.createElement('div');
@@ -1511,15 +1572,14 @@ function printReceipt(){
     document.body.appendChild(printDiv);
   }
   printDiv.innerHTML=`
-    <div style="text-align:center;margin-bottom:12px;">
-      <div style="font-size:20px;font-weight:900;color:#2d4a31;">擇木良食藥局</div>
-      <div style="font-size:11px;color:#888;margin-top:3px;">健康銷售收據</div>
-    </div>
-    <hr style="border:none;border-top:1px dashed #ccc;margin:10px 0;">
-    <p style="text-align:center;font-weight:700;margin:8px 0;">${msg}</p>
+    <div class="receipt-title">擇木良食藥局</div>
+    <div class="receipt-subtitle">健康銷售收據</div>
+    <hr class="receipt-divider">
+    <div style="text-align:center;font-weight:700;font-size:12pt;margin:2mm 0;">${msg}</div>
+    <hr class="receipt-divider">
     ${clone.innerHTML}
-    <hr style="border:none;border-top:1px dashed #ccc;margin:10px 0;">
-    <div style="text-align:center;color:#aaa;font-size:10px;margin-top:8px;">感謝您的購買，祝您身體健康 🌿</div>`;
+    <hr class="receipt-divider">
+    <div class="receipt-footer">感謝您的購買<br>祝您身體健康</div>`;
 
   window.print();
 }
