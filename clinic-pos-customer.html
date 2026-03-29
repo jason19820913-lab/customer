@@ -1509,7 +1509,7 @@ async function doCheckout(){
     <div style="font-size:10px;color:#888;margin-bottom:8px;">${clinic} ｜ ${date} ${time}${staffLine?'<br>服務人員：'+staffLine:''}</div>
     ${itemRows}
     <div style="border-top:1px dashed #ccc;margin:8px 0;"></div>
-    \${remark?`<div class="receipt-row"><span>備註</span><span>${remark}</span></div>`:''}
+    ${remark?`<div class="receipt-row"><span>備註</span><span>${remark}</span></div>`:''}
     <div class="receipt-row"><span>付款方式</span><span>${payMethod==='cash'?'現金':'轉帳'}</span></div>
     <div class="receipt-row" style="font-weight:900;font-size:14px;border-top:1px solid #ccc;margin-top:6px;padding-top:6px;"><span>結帳總額</span><span style="color:#000;">NT$${total.toLocaleString()}</span></div>
     <div id="syncStatus" style="margin-top:8px;text-align:center;font-size:10px;color:#aaa;">📡 同步中...</div>`;
