@@ -1546,7 +1546,7 @@ async function doCheckout(){
       const allHeaders=[...FIXED_FRONT,...productCols,...FIXED_BACK];
       const row={
         '日期':entry.date,'時間':entry.time,'院區':entry.clinic,
-        '顧客姓名':entry.customer,'身分證遮罩':entry.idMask||'','病歷號':entry.phone||'',
+        '顧客姓名':entry.customer,'身分證遮罩':entry.idMask||'','病歷號':entry.phone?("'"+entry.phone):'',
         '備註':entry.remark||'','當班醫師':entry.doctor,'櫃檯人員':entry.staff||'','護理師':entry.nurse||'','藥師':entry.pharma||'',
         '結帳金額':entry.total,'付款方式':entry.payMethod,
         '醫師抽成':entry.doctorComm||0,'櫃檯抽成':entry.staffComm||0,
