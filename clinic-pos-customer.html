@@ -839,8 +839,7 @@ function buildItems(memberPromoOverride){
       if(!grpMatch&&scope!=='all') return;
       // 解析 _default_ 優惠價
       let defP=null;
-      (mp.staffPriceMap||'').split(/
-/).forEach(line=>{
+      (mp.staffPriceMap||'').split(/\n/).forEach(line=>{
         const m=line.trim().match(/^_default_=([\d.]+)$/);
         if(m) defP=Number(m[1]);
       });
