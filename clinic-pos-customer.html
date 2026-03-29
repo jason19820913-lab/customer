@@ -829,7 +829,23 @@ function buildItems(memberPromoOverride){
     const emoji=grp==='protein'?'🥛':'💧';
     const label=grp==='protein'?'蛋白代餐':'Q飽纖燃飲';
     const fla=ps.filter(p=>cart[p.id]>0).map(p=>`${p.name}×${cart[p.id]}`).join('、');
-    const unitPrice=ps[0]?.price||BUNDLE[grp].unit;
+    // 若有 staffPrice 員工優惠價 且 defaultPrice=0，unitPrice 照舊（用 staffPrice 扣除）
+    // 若有 staffPrice 且 defaultPrice>0，用員工優惠價計算買N送N
+    let unitPrice=ps[0]?.price||BUNDLE[grp].unit;
+    memberPromos.forEach(mp=>{
+      if(mp.type!=='staffPrice') return;
+      const scope=String(mp.scope||'');
+      const grpMatch=scope===`group:${grp}`;
+      if(!grpMatch&&scope!=='all') return;
+      // 解析 _default_ 優惠價
+      let defP=null;
+      (mp.staffPriceMap||'').split(/
+/).forEach(line=>{
+        const m=line.trim().match(/^_default_=([\d.]+)$/);
+        if(m) defP=Number(m[1]);
+      });
+      if(defP!==null && defP>0) unitPrice=defP; // 非0優惠價才改unitPrice，0元走原本扣除邏輯
+    });
 
     // 找適用此群組的 buyNgetN 促銷
     const buyNPromo=promos.find(pm=>pm.type==='buyNgetN'
@@ -974,6 +990,11 @@ function buildItems(memberPromoOverride){
         allProducts.forEach(p=>{
           const qty=cart[p.id]||0;
           if(!qty) return;
+          // 若此商品屬於 protein/mct 群組且 defaultPrice>0，unitPrice 已改過，不重複扣除
+          const grpKey=p.group||'';
+          const scopeStr2=String(memberPromo.scope||'');
+          const isGroupScope=scopeStr2===`group:${grpKey}`;
+          if(defaultPrice!==null && defaultPrice>0 && (isGroupScope||scopeStr2==='all') && ['protein','mct'].includes(grpKey)) return;
           const pName=(p.name||'').trim();
           let staffP=priceMap[pName];
           if(staffP===undefined && defaultPrice!==null && inScope(p)) staffP=defaultPrice;
