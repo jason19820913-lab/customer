@@ -1184,7 +1184,7 @@ function renderStats(){
   }
 
   document.getElementById('statsHead').innerHTML=`<tr>
-    <th>日期</th><th>時間</th><th style="white-space:nowrap;">院區</th><th>顧客</th><th style="white-space:nowrap;">病歷號</th><th>備註</th><th>醫師</th><th>櫃檯</th><th>護理師</th><th>藥師</th>
+    <th>日期</th><th>時間</th><th style="white-space:nowrap;">院區</th><th>顧客</th><th style="white-space:nowrap;">病歷號</th><th>身份</th><th>備註</th><th>醫師</th><th>櫃檯</th><th>護理師</th><th>藥師</th>
     ${statKeys.map(k=>`<th style="font-size:10px;white-space:nowrap;">${k}</th>`).join('')}
     <th>金額</th><th>付款</th>
     <th style="color:#7B6200;white-space:nowrap;">醫師抽成</th>
@@ -1197,7 +1197,7 @@ function renderStats(){
   function commCell(v){return v?`<td style="white-space:nowrap;text-align:right;color:var(--brown);">NT$${v.toLocaleString()}</td>`:`<td style="text-align:center;color:#ddd;">—</td>`;}
 
   const tbody=document.getElementById('logBody');
-  if(!log.length){tbody.innerHTML=`<tr class="empty-row"><td colspan="${17+statKeys.length}">尚無銷售紀錄</td></tr>`;return;}
+  if(!log.length){tbody.innerHTML=`<tr class="empty-row"><td colspan="${18+statKeys.length}">尚無銷售紀錄</td></tr>`;return;}
   tbody.innerHTML=[...log].reverse().map(e=>{
     const cm=getEntryComm(e);
     return`<tr>
@@ -1206,6 +1206,7 @@ function renderStats(){
       <td><span style="font-size:10px;background:var(--sage-pale);color:var(--sage);padding:2px 7px;border-radius:9px;font-weight:600;white-space:nowrap;">${e.clinic||'-'}</span></td>
       <td><strong>${e.customer||''}</strong></td>
       <td style="white-space:nowrap;color:#888;font-size:11px;">${e.phone||'—'}</td>
+      <td style="white-space:nowrap;">${e.identity?`<span style="font-size:10px;background:#FFF3E0;color:#E65100;padding:2px 8px;border-radius:9px;font-weight:600;">${e.identity}</span>`:`<span style="color:#ddd;">—</span>`}</td>
       <td style="white-space:nowrap;color:#666;font-size:11px;">${e.remark||'—'}</td>
       <td style="white-space:nowrap;">${e.doctor||'-'}</td>
       <td style="white-space:nowrap;">${e.staff||'-'}</td>
@@ -1238,7 +1239,7 @@ async function loadSalesFromSheet(){
     // 將 Sheet 欄位轉換成 entry 格式
     const entries=d.rows.map(r=>{
       // 找出商品欄（非固定欄位）
-      const FIXED=['日期','時間','院區','顧客姓名','身分證遮罩','病歷號','備註','當班醫師','櫃檯人員','護理師','藥師','結帳金額','付款方式','醫師抽成','櫃檯抽成','護理師抽成','藥師抽成','身分證雜湊'];
+      const FIXED=['日期','時間','院區','顧客姓名','身分證遮罩','病歷號','顧客身份','備註','當班醫師','櫃檯人員','護理師','藥師','結帳金額','付款方式','醫師抽成','櫃檯抽成','護理師抽成','藥師抽成','身分證雜湊'];
       const itemQty={};
       const itemParts=[];
       Object.keys(r).forEach(k=>{
@@ -1257,6 +1258,7 @@ async function loadSalesFromSheet(){
         staff: r['櫃檯人員']||'',
         nurse: r['護理師']||'',
         pharma: r['藥師']||'',
+        identity: r['顧客身份']||'',
         remark: r['備註']||'',
         items: itemParts.join('、'),
         itemQty,
