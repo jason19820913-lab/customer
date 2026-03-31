@@ -311,8 +311,8 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
             <input class="fg-input" type="text" id="customerName" placeholder="請輸入顧客姓名" oninput="onCustomerChange()">
           </div>
           <div class="form-group">
-            <label>病歷號</label>
-            <input class="fg-input" type="text" id="chartNumber" placeholder="請輸入病歷號（選填）">
+            <label>病歷號 <span style="color:#c62828;">*</span></label>
+            <input class="fg-input" type="text" id="chartNumber" placeholder="請輸入病歷號" oninput="renderSidebar()">
           </div>
         </div>
         <!-- 隱藏的員工欄位，由密碼 modal 填入 -->
@@ -1023,9 +1023,10 @@ function cartHtml(){
   const total=items.reduce((s,i)=>s+i.price,0);
   const doc=document.getElementById('doctorSelect').value;
   const cust=document.getElementById('customerName').value.trim();
+  const chartNum=document.getElementById('chartNumber').value.trim();
   const clinic=document.getElementById('clinicSelect').value;
   const cashVal=document.getElementById('cashInput')?.value||'';
-  const ok=items.length>0&&cust&&clinic;
+  const ok=items.length>0&&cust&&clinic&&chartNum;
   return `
     <div class="sb-head">
       <h2>🧾 購物清單</h2>
