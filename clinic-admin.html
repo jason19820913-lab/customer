@@ -1198,7 +1198,7 @@ function renderStats(){
 
   const tbody=document.getElementById('logBody');
   if(!log.length){tbody.innerHTML=`<tr class="empty-row"><td colspan="${18+statKeys.length}">尚無銷售紀錄</td></tr>`;return;}
-  tbody.innerHTML=[...log].reverse().map(e=>{
+  const rows=[...log].reverse().map(e=>{
     const cm=getEntryComm(e);
     return`<tr>
       <td style="white-space:nowrap;">${fmtDate(e.date)||''}</td>
@@ -1217,7 +1217,32 @@ function renderStats(){
       <td><span class="tag ${e.payMethod==='cash'?'tag-cash':'tag-transfer'}">${e.payMethod==='cash'?'現金':'轉帳'}</span></td>
       ${commCell(cm.dr)}${commCell(cm.st)}${commCell(cm.nu)}${commCell(cm.ph)}
     </tr>`;
-  }).join('');
+  });
+
+  // ── 加總列 ──
+  const totalQtyMap={};
+  statKeys.forEach(k=>{ totalQtyMap[k]=log.reduce((s,e)=>s+getQty(e,k),0); });
+  const totalAmount=log.reduce((s,e)=>s+(e.total||0),0);
+  const totalDr=log.reduce((s,e)=>s+getEntryComm(e).dr,0);
+  const totalSt=log.reduce((s,e)=>s+getEntryComm(e).st,0);
+  const totalNu=log.reduce((s,e)=>s+getEntryComm(e).nu,0);
+  const totalPh=log.reduce((s,e)=>s+getEntryComm(e).ph,0);
+  const fixedCols=11; // 日期~藥師共11欄
+  const sumRow=`<tr style="background:#F0F5F1;font-weight:700;border-top:2px solid var(--sage);">
+    <td colspan="${fixedCols}" style="text-align:right;padding:8px 12px;font-size:12px;color:var(--brown);">合計（${log.length} 筆）</td>
+    ${statKeys.map(k=>{
+      const tot=totalQtyMap[k];
+      return tot>0?`<td style="text-align:center;color:var(--sage);font-size:13px;">${tot}</td>`:`<td style="text-align:center;color:#ddd;">—</td>`;
+    }).join('')}
+    <td style="white-space:nowrap;color:var(--sage);font-size:13px;">NT$${totalAmount.toLocaleString()}</td>
+    <td></td>
+    <td style="white-space:nowrap;color:var(--brown);font-size:12px;">${totalDr?'NT$'+totalDr.toLocaleString():'—'}</td>
+    <td style="white-space:nowrap;color:var(--brown);font-size:12px;">${totalSt?'NT$'+totalSt.toLocaleString():'—'}</td>
+    <td style="white-space:nowrap;color:var(--brown);font-size:12px;">${totalNu?'NT$'+totalNu.toLocaleString():'—'}</td>
+    <td style="white-space:nowrap;color:var(--brown);font-size:12px;">${totalPh?'NT$'+totalPh.toLocaleString():'—'}</td>
+  </tr>`;
+
+  tbody.innerHTML=rows.join('')+sumRow;
 }
 
 function clearLog(){
