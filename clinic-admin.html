@@ -811,6 +811,7 @@ async function initApp(){
   loadClinicData(); loadStaffData(); renderStaffLists();
   renderProductManager();
   loadPromoData(); loadCommData();
+  renderRemarkChips();
   const u = gasUrl();
   if(u){ document.getElementById('gsUrlInput').value=u; document.getElementById('gsBadge').classList.add('show'); }
   document.getElementById('statsDateLabel').textContent=new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'short'})+' 銷售概覽';
