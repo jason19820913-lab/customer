@@ -820,13 +820,12 @@ async function initApp(){
   // 背景從 Sheet 拉取最新資料（全資料表一次拉）
   if(!u) return;
   try{
-    const [prodD, staffD, clinicD, promoD, commD, remarkD] = await Promise.all([
+    const [prodD, staffD, clinicD, promoD, commD] = await Promise.all([
       gasRead('商品主檔'),
       gasRead('人員名單'),
       gasRead('院區清單'),
       gasRead('促銷活動'),
       gasRead('分潤規則'),
-      gasRead('備註清單'),
     ]);
 
     // 商品主檔
@@ -878,14 +877,25 @@ async function initApp(){
       localStorage.setItem(COMM_KEY, JSON.stringify(editCommRules));
     }
 
-    // 備註清單
-    if(remarkD.status==='ok' && remarkD.rows?.length){
-      const remarks=remarkD.rows.map(r=>String(r['備註']||'').trim()).filter(Boolean);
-      if(remarks.length){ localStorage.setItem(REMARK_KEY,JSON.stringify(remarks)); renderRemarkChips(); }
-    }
 
     console.info('[initApp] 已從 Sheet 同步所有資料');
     toast('☁️ 資料已從 Google Sheet 同步');
+
+    // 備註清單：獨立同步
+    gasRead('備註清單').then(rd=>{
+      if(rd?.status==='ok' && rd.rows?.length){
+        const remarks=rd.rows.map(r=>String(r['備註']||'').trim()).filter(Boolean);
+        if(remarks.length){ localStorage.setItem(REMARK_KEY,JSON.stringify(remarks)); renderRemarkChips(); }
+      } else {
+        // Sheet 沒有備註清單 → 自動建立並寫入預設值
+        const defaults=getRemarks();
+        const rows=defaults.map(r=>({'備註':r}));
+        gasWrite('備註清單',['備註'],rows).then(()=>{
+          toast('📋 已自動建立備註清單');
+          renderRemarkChips();
+        }).catch(()=>{});
+      }
+    }).catch(()=>{});
   }catch(e){
     console.warn('[initApp] Sheet 同步失敗，使用本機快取', e.message);
   }
