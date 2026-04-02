@@ -551,13 +551,13 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   // 從 Google Sheet 同步商品、人員名單、院區
   if(gasUrl()){
     try{
-      const [pd, sd, cd, promoD, commD] = await Promise.all([
+      const [pd, sd, cd, promoD, commD, remarkD] = await Promise.all([
         gasRead('商品主檔'),
         gasRead('人員名單'),
         gasRead('院區清單'),
         gasRead('促銷活動'),
-        gasRead('分潤規則')
-      ]);
+        gasRead('分潤規則'),
+        gasRead('備註清單')
 
       // 商品主檔：每列一筆商品
       if(pd.status==='ok' && pd.rows && pd.rows.length){
@@ -585,13 +585,8 @@ document.addEventListener('DOMContentLoaded', async ()=>{
         console.info('[staff] 已同步人員名單');
       }
 
-      // 備註清單：獨立非同步，不阻塞主要同步
-      gasRead('備註清單').then(rd=>{
-        if(rd?.status==='ok' && rd.rows?.length){
-          const remarks=rd.rows.map(r=>String(r['備註']||'').trim()).filter(Boolean);
           if(remarks.length) localStorage.setItem(REMARK_KEY,JSON.stringify(remarks));
         }
-      }).catch(()=>{});
 
       // 促銷活動
       if(promoD.status==='ok' && promoD.rows){
@@ -606,6 +601,11 @@ document.addEventListener('DOMContentLoaded', async ()=>{
         }));
         localStorage.setItem(PROMO_KEY, JSON.stringify(promos));
         console.info('[promos] 已同步促銷活動，共', promos.length, '項');
+
+      // 備註清單
+      if(remarkD?.status==='ok' && remarkD.rows?.length){
+        const remarks=remarkD.rows.map(r=>String(r['備註']||'').trim()).filter(Boolean);
+        if(remarks.length) localStorage.setItem(REMARK_KEY,JSON.stringify(remarks));
       }
 
       // 分潤規則
