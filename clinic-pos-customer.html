@@ -377,10 +377,6 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
         <label style="font-size:12px;color:var(--brown);font-weight:700;">📋 備註 <span style="color:#aaa;font-weight:400;font-size:11px;">(選填)</span></label>
         <select class="fg-input" id="pinRemark">
           <option value="">— 無備註 —</option>
-          <option value="金醫師">金醫師</option>
-          <option value="猛健樂">猛健樂</option>
-          <option value="胰妥讚4週">胰妥讚4週</option>
-          <option value="胰妥讚8週">胰妥讚8週</option>
         </select>
       </div>
       <!-- 醫師（非必填，獨立） -->
@@ -474,6 +470,19 @@ const DEFAULT_PRODUCTS=[];
 // 買6送1預設值（當無促銷活動時的 fallback）
 const BUNDLE={protein:{unit:90,bundle:540},mct:{unit:100,bundle:600}};
 const CAT_EMOJI={'蛋白代餐':'🥛','Q飽纖燃飲':'💧','看診套組':'🎁','盒裝膠囊':'💊','其他營養':'🌿'};
+
+const REMARK_KEY='clinicRemarks';
+const DEFAULT_REMARKS=['金醫師','猛健樂','胰妥讚4週','胰妥讚8週'];
+function getRemarks(){
+  try{const s=localStorage.getItem(REMARK_KEY);return s?JSON.parse(s):[...DEFAULT_REMARKS];}catch(e){return[...DEFAULT_REMARKS];}
+}
+function renderPinRemarks(){
+  const sel=document.getElementById('pinRemark');
+  if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">— 無備註 —</option>'+
+    getRemarks().map(r=>`<option value="${r}"${r===cur?' selected':''}>${r}</option>`).join('');
+}
 
 function getProducts(){
   try{const s=localStorage.getItem(PRODUCTS_KEY);return s?JSON.parse(s):[];}catch(e){return[];}
@@ -1555,8 +1564,6 @@ async function doCheckout(){
     }
   });
 
-  console.log('[actualPriceMap]', JSON.stringify(actualPriceMap));
-  console.log('[items]', items.map(i=>({name:i.name,price:i.price,group:i.group})));
   let cm;
   if(isNoComm){
     cm={dr:0,st:0,nu:0,ph:0};
