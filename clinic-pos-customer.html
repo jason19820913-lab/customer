@@ -1347,10 +1347,12 @@ function verifyPin(){
       document.getElementById('pinModalMsg').textContent='請填寫當班人員資訊（可部分填寫）';
       renderModalDDs();
       renderMemberDiscountBtns();
-    }).catch(()=>{renderModalDDs();renderMemberDiscountBtns();});
+      renderPinRemarks();
+    }).catch(()=>{renderModalDDs();renderMemberDiscountBtns();renderPinRemarks();});
   } else {
     renderModalDDs();
     renderMemberDiscountBtns();
+    renderPinRemarks();
   }
 }
 
