@@ -849,12 +849,59 @@ function buildItems(memberPromoOverride){
     // 找適用此群組的 buyNgetN 促銷
     const buyNPromo=promos.find(pm=>pm.type==='buyNgetN'
       && ps.some(p=>promoMatchesProduct(pm,p)) && pm.buyQty>0);
+    const tieredPromo=promos.find(pm=>pm.type==='tieredBundle'
+      && ps.some(p=>promoMatchesProduct(pm,p)));
 
     let price,sub;
-    if(buyNPromo){
+    if(tieredPromo){
+      // 解析階梯設定：每行 "買N送N=每組價格"
+      // 第1行：第1組規則；第2行：第2組起規則
+      // 例：6送1=540 → 第1組7包540；12送2=1000 → 第2組起每14包1000
+      const tiers=[];
+      (tieredPromo.staffPriceMap||'').split(/\n/).forEach(line=>{
+        const m=line.trim().match(/^(\d+)送(\d+)=(\d+)$/);
+        if(m) tiers.push({buy:Number(m[1]),free:Number(m[2]),setPrice:Number(m[3])});
+      });
+      if(tiers.length){
+        let remaining=tot, totalPrice=0, subParts=[], origTotal=0;
+        const t0=tiers[0]; // 第1組規則
+        const t1=tiers[1]||t0; // 第2組起規則（沒設就同第1組）
+        const set0Size=t0.buy+t0.free;
+        const set1Size=t1.buy+t1.free;
+
+        // 先分第1組（只取1組）
+        if(remaining>=set0Size){
+          totalPrice+=t0.setPrice;
+          origTotal+=set0Size*unitPrice;
+          subParts.push(`1組買${t0.buy}送${t0.free}(NT$${t0.setPrice})`);
+          remaining-=set0Size;
+        }
+        // 剩下的包數，第2組起規則
+        if(remaining>=set1Size){
+          const extraSets=Math.floor(remaining/set1Size);
+          const extraRem=remaining%set1Size;
+          totalPrice+=extraSets*t1.setPrice;
+          origTotal+=extraSets*set1Size*unitPrice;
+          subParts.push(`${extraSets}組買${t1.buy}送${t1.free}(NT$${t1.setPrice}/組)`);
+          remaining=extraRem;
+        }
+        // 散包
+        if(remaining>0){
+          totalPrice+=remaining*unitPrice;
+          origTotal+=remaining*unitPrice;
+          subParts.push(`${remaining}包散裝`);
+        }
+        price=totalPrice;
+        const saved=Math.round(tot*unitPrice-totalPrice);
+        sub=subParts.join('＋')+(saved>0?`（省NT$${saved}）`:'')+`｜${fla}`;
+      } else {
+        price=tot*unitPrice;
+        sub=`散裝｜${fla}`;
+      }
+    } else if(buyNPromo){
       const B=buyNPromo.buyQty,F=buyNPromo.freeQty||0;
       const setSize=B+F, sets=Math.floor(tot/setSize), rem=tot%setSize;
-      const bundlePrice=B*unitPrice;   // 買B包付B包錢
+      const bundlePrice=B*unitPrice;
       price=sets*bundlePrice+rem*unitPrice;
       const savings=sets*F*unitPrice;
       sub=sets>0
