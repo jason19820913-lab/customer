@@ -860,47 +860,37 @@ function buildItems(memberPromoOverride){
       && ps.some(p=>promoMatchesProduct(pm,p))):null;
 
     let price,sub;
+    let price,sub;
     if(hasStaffPriceForGrp && unitPrice>0){
       // 員工身份：每包員工單價，不套組合優惠
       price=tot*unitPrice;
       sub=`員工價NT$${unitPrice}/包×${tot}包｜${fla}`;
     } else if(tieredPromo){
-      // 解析階梯設定：每行 "買N送N=每組價格"
-      // 第1行：第1組規則；第2行：第2組起規則
-      // 例：6送1=540 → 第1組7包540；12送2=1000 → 第2組起每14包1000
+      // 階梯優惠：格式 "買N送N=累積N組總價"
       const tiers=[];
       (tieredPromo.staffPriceMap||'').replace(/\\n/g,'\n').split(/\n/).forEach(line=>{
         const m=line.trim().match(/^(\d+)送(\d+)=(\d+)$/);
         if(m) tiers.push({buy:Number(m[1]),free:Number(m[2]),setPrice:Number(m[3])});
       });
       if(tiers.length){
-        let remaining=tot, totalPrice=0, subParts=[], origTotal=0;
-        const t0=tiers[0]; // 第1組規則
-        const t1=tiers[1]||t0; // 第2組起規則（沒設就同第1組）
-        const set0Size=t0.buy+t0.free;
-        const set1Size=t1.buy+t1.free;
-
-        // 先分第1組（只取1組）
-        if(remaining>=set0Size){
-          totalPrice+=t0.setPrice;
-          origTotal+=set0Size*unitPrice;
-          subParts.push(`1組買${t0.buy}送${t0.free}(NT$${t0.setPrice})`);
-          remaining-=set0Size;
-        }
-        // 剩下的包數，第2組起規則
-        if(remaining>=set1Size){
-          const extraSets=Math.floor(remaining/set1Size);
-          const extraRem=remaining%set1Size;
-          totalPrice+=extraSets*t1.setPrice;
-          origTotal+=extraSets*set1Size*unitPrice;
-          subParts.push(`${extraSets}組買${t1.buy}送${t1.free}(NT$${t1.setPrice}/組)`);
-          remaining=extraRem;
-        }
-        // 散包
-        if(remaining>0){
-          totalPrice+=remaining*unitPrice;
-          origTotal+=remaining*unitPrice;
-          subParts.push(`${remaining}包散裝`);
+        const setSize=tiers[0].buy+tiers[0].free;
+        const sets=Math.floor(tot/setSize);
+        const rem=tot%setSize;
+        let totalPrice=0,subParts=[];
+        if(sets===0){
+          totalPrice=rem*unitPrice;
+          subParts.push(`${rem}包散裝`);
+        } else {
+          let bundleTotal=0;
+          if(sets<=tiers.length){
+            bundleTotal=tiers[sets-1].setPrice;
+          } else {
+            const lastSets=tiers.length;
+            bundleTotal=Math.round(tiers[tiers.length-1].setPrice/lastSets*sets);
+          }
+          totalPrice=bundleTotal+rem*unitPrice;
+          subParts.push(`${sets}組(NT$${bundleTotal})`);
+          if(rem) subParts.push(`${rem}包散裝`);
         }
         price=totalPrice;
         const saved=Math.round(tot*unitPrice-totalPrice);
@@ -911,19 +901,16 @@ function buildItems(memberPromoOverride){
       }
     } else if(buyNPromo){
       const B=buyNPromo.buyQty,F=buyNPromo.freeQty||0;
-      const setSize=B+F, sets=Math.floor(tot/setSize), rem=tot%setSize;
+      const setSize=B+F,sets=Math.floor(tot/setSize),rem=tot%setSize;
       const bundlePrice=B*unitPrice;
       price=sets*bundlePrice+rem*unitPrice;
       const savings=sets*F*unitPrice;
-      sub=sets>0
-        ?`${sets}組買${B}送${F}${rem>0?`+${rem}散`:''}（省NT$${savings}）｜${fla}`
-        :`散裝｜${fla}`;
+      sub=sets>0?`${sets}組買${B}送${F}${rem>0?`+${rem}散`:''}（省NT$${savings}）｜${fla}`:`散裝｜${fla}`;
     } else {
-      // fallback：用 BUNDLE 硬碼值（向後相容）
-      const cfg=BUNDLE[grp];
-      const b=Math.floor(tot/6),r=tot%6;
-      price=b*cfg.bundle+r*unitPrice;
-      sub=(b>0?`${b}組買6送1${r>0?`+${r}散`:''}`:''+'散裝')+'｜'+fla;
+      price=tot*unitPrice;
+      sub=`散裝｜${fla}`;
+    }
+
     }
     items.push({emoji,name:`${label} x${tot}包`,sub,price,group:grp});
   });
