@@ -737,7 +737,8 @@ function json(o) {
 
 <script>
 // ── KEYS ──
-const SALES_KEY='clinicSalesLog',GS_KEY='gsUrl',PIN_KEY='adminPin',MGMT_PIN_KEY='mgmtPin',STAFF_KEY='clinicStaff',PRODUCTS_KEY='clinicProducts',CLINIC_KEY='clinicClinics',PROMO_KEY='clinicPromos',COMM_KEY='clinicCommRules';
+const SALES_KEY='clinicSalesLog',GS_KEY='gsUrl',PIN_KEY='adminPin',MGMT_PIN_KEY='mgmtPin',STAFF_KEY='clinicStaff',PRODUCTS_KEY='clinicProducts',CLINIC_KEY='clinicClinics',PROMO_KEY='clinicPromos',COMM_KEY='clinicCommRules',REMARK_KEY='clinicRemarks';
+const DEFAULT_REMARKS=['金醫師','猛健樂','胰妥讚4週','胰妥讚8週'];
 const DEFAULT_PIN='1234';
 
 // ── DEFAULT PRODUCTS ──
@@ -919,6 +920,45 @@ function closeMgmtPinModal(){
 // 切換到銷售統計或顧客查詢時，重置管理密碼驗證狀態（保護措施）
 function resetMgmtSession(){
   mgmtPinVerified=false;
+}
+
+function getRemarks(){
+  try{const s=localStorage.getItem(REMARK_KEY);return s?JSON.parse(s):[...DEFAULT_REMARKS];}catch(e){return[...DEFAULT_REMARKS];}
+}
+function saveRemarks(arr){localStorage.setItem(REMARK_KEY,JSON.stringify(arr));}
+
+function renderRemarkChips(){
+  const chips=document.getElementById('remarkChips');
+  if(!chips) return;
+  const remarks=getRemarks();
+  if(!remarks.length){chips.innerHTML='<span style="font-size:11px;color:#aaa;">尚無備註選項</span>';return;}
+  chips.innerHTML=remarks.map((r,i)=>`
+    <div style="display:flex;align-items:center;gap:4px;background:#F0F5F1;border:1.5px solid #D0DEAD;border-radius:20px;padding:4px 14px;">
+      <span style="font-size:12px;font-weight:500;">${r}</span>
+      <button onclick="removeRemark(${i})" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:15px;padding:0 0 0 4px;line-height:1;" title="刪除">×</button>
+    </div>`).join('');
+}
+
+function addRemark(){
+  const inp=document.getElementById('newRemarkInput');
+  if(!inp) return;
+  const val=inp.value.trim();
+  if(!val){toast('⚠️ 請輸入備註內容');return;}
+  const remarks=getRemarks();
+  if(remarks.includes(val)){toast('⚠️ 此備註已存在');return;}
+  remarks.push(val);
+  saveRemarks(remarks);
+  inp.value='';
+  renderRemarkChips();
+  toast('✅ 備註「'+val+'」已新增');
+}
+
+function removeRemark(idx){
+  const remarks=getRemarks();
+  const removed=remarks.splice(idx,1)[0];
+  saveRemarks(remarks);
+  renderRemarkChips();
+  toast('🗑️ 已刪除「'+removed+'」');
 }
 
 function switchPage(p){
