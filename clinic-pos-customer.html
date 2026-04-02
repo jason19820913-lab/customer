@@ -846,14 +846,25 @@ function buildItems(memberPromoOverride){
       if(defP!==null && defP>0) unitPrice=defP; // 非0優惠價才改unitPrice，0元走原本扣除邏輯
     });
 
+    // 判斷是否有員工 staffPrice 套用此群組（有的話不享組合價）
+    const hasStaffPriceForGrp=memberPromos.some(mp=>{
+      if(mp.type!=='staffPrice') return false;
+      const scope=String(mp.scope||'');
+      return scope===`group:${grp}`||scope==='all';
+    });
+
     // 找適用此群組的 buyNgetN 促銷
-    const buyNPromo=promos.find(pm=>pm.type==='buyNgetN'
-      && ps.some(p=>promoMatchesProduct(pm,p)) && pm.buyQty>0);
-    const tieredPromo=promos.find(pm=>pm.type==='tieredBundle'
-      && ps.some(p=>promoMatchesProduct(pm,p)));
+    const buyNPromo=(!hasStaffPriceForGrp)?promos.find(pm=>pm.type==='buyNgetN'
+      && ps.some(p=>promoMatchesProduct(pm,p)) && pm.buyQty>0):null;
+    const tieredPromo=(!hasStaffPriceForGrp)?promos.find(pm=>pm.type==='tieredBundle'
+      && ps.some(p=>promoMatchesProduct(pm,p))):null;
 
     let price,sub;
-    if(tieredPromo){
+    if(hasStaffPriceForGrp && unitPrice>0){
+      // 員工身份：每包員工單價，不套組合優惠
+      price=tot*unitPrice;
+      sub=`員工價NT$${unitPrice}/包×${tot}包｜${fla}`;
+    } else if(tieredPromo){
       // 解析階梯設定：每行 "買N送N=每組價格"
       // 第1行：第1組規則；第2行：第2組起規則
       // 例：6送1=540 → 第1組7包540；12送2=1000 → 第2組起每14包1000
