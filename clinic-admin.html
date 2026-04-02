@@ -820,12 +820,13 @@ async function initApp(){
   // 背景從 Sheet 拉取最新資料（全資料表一次拉）
   if(!u) return;
   try{
-    const [prodD, staffD, clinicD, promoD, commD] = await Promise.all([
+    const [prodD, staffD, clinicD, promoD, commD, remarkD] = await Promise.all([
       gasRead('商品主檔'),
       gasRead('人員名單'),
       gasRead('院區清單'),
       gasRead('促銷活動'),
       gasRead('分潤規則'),
+      gasRead('備註清單'),
     ]);
 
     // 商品主檔
@@ -877,6 +878,12 @@ async function initApp(){
       localStorage.setItem(COMM_KEY, JSON.stringify(editCommRules));
     }
 
+    // 備註清單
+    if(remarkD.status==='ok' && remarkD.rows?.length){
+      const remarks=remarkD.rows.map(r=>String(r['備註']||'').trim()).filter(Boolean);
+      if(remarks.length){ localStorage.setItem(REMARK_KEY,JSON.stringify(remarks)); renderRemarkChips(); }
+    }
+
     console.info('[initApp] 已從 Sheet 同步所有資料');
     toast('☁️ 資料已從 Google Sheet 同步');
   }catch(e){
@@ -925,7 +932,16 @@ function resetMgmtSession(){
 function getRemarks(){
   try{const s=localStorage.getItem(REMARK_KEY);return s?JSON.parse(s):[...DEFAULT_REMARKS];}catch(e){return[...DEFAULT_REMARKS];}
 }
-function saveRemarks(arr){localStorage.setItem(REMARK_KEY,JSON.stringify(arr));}
+function saveRemarks(arr){
+  localStorage.setItem(REMARK_KEY,JSON.stringify(arr));
+  // 同步到 Sheet
+  if(gasUrl()){
+    const rows=arr.map(r=>({'備註':r}));
+    gasWrite('備註清單',['備註'],rows)
+      .then(d=>d.status==='ok'?null:toast('⚠️ 備註同步失敗'))
+      .catch(()=>toast('⚠️ 備註同步網路錯誤'));
+  }
+}
 
 function renderRemarkChips(){
   const chips=document.getElementById('remarkChips');
