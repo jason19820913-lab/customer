@@ -337,10 +337,6 @@ tbody tr:hover td{background:var(--sage-pale);}
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
         <select id="remarkFilter" style="font-size:11px;padding:4px 8px;border:1.5px solid #D0DEAD;border-radius:10px;font-family:inherit;color:var(--brown);background:#fff;cursor:pointer;" onchange="renderStats()">
           <option value="">全部備註</option>
-          <option value="金醫師">金醫師</option>
-          <option value="猛健樂">猛健樂</option>
-          <option value="胰妥讚4週">胰妥讚4週</option>
-          <option value="胰妥讚8週">胰妥讚8週</option>
           <option value="__none__">無備註</option>
         </select>
         <button class="btn-sm" onclick="loadSalesFromSheet()" style="background:var(--sage);color:#fff;border-color:var(--sage);">☁️ 從 Sheet 載入</button>
@@ -478,7 +474,19 @@ tbody tr:hover td{background:var(--sage-pale);}
 
   <div class="page" id="pageSettings">
     <div class="page-title">系統設定</div>
-    <div class="page-sub">Google Sheets 串接、人員名單、PIN 碼</div>
+    <div class="page-sub">Google Sheets 串接、人員名單、PIN 碼、備註選項</div>
+
+    <!-- 備註選項管理 -->
+    <div class="sc">
+      <h3>📋 備註選項管理</h3>
+      <p>結帳時員工可選擇的備註選項，修改後立即生效。</p>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <input type="text" id="newRemarkInput" class="fg-input" placeholder="輸入新備註項目（例：胰妥讚6週）"
+          onkeydown="if(event.key==='Enter')addRemark()" style="flex:1;">
+        <button class="btn btn-primary" onclick="addRemark()" style="white-space:nowrap;">＋ 新增</button>
+      </div>
+      <div id="remarkChips" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+    </div>
 
     <!-- GS -->
     <div class="sc">
@@ -922,6 +930,7 @@ function switchPage(p){
   if(p==='comm')renderCommPage();
   // 切回一般頁面時重置管理驗證
   if(p==='stats'||p==='patient') mgmtPinVerified=false;
+  if(p==='settings') renderRemarkChips();
 }
 
 // ── STATS ──
@@ -1067,8 +1076,17 @@ function getEntryComm(e){
   return calcComm(e.items||'', !!e.doctor, !!e.staff, !!e.nurse, !!e.pharma);
 }
 
+function renderRemarkFilter(){
+  const sel=document.getElementById('remarkFilter');
+  if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">全部備註</option><option value="__none__">無備註</option>'+
+    getRemarks().map(r=>`<option value="${r}"${r===cur?' selected':''}>${r}</option>`).join('');
+}
+
 function renderStats(){
   renderClinicFilterBtns();
+  renderRemarkFilter();
   const allLog=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
   // 日期過濾
   // 台灣時區 (UTC+8) 的今日日期
