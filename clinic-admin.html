@@ -1798,7 +1798,7 @@ function savePmModal(){
    促銷活動管理
    ══════════════════════════════════════════ */
 const PROMO_HEADERS=['id','name','type','scope','buyQty','freeQty','discountValue','active','startDate','endDate','memberLabel','staffPriceMap','noComm','noCommDoctor'];
-const PROMO_TYPE_LABEL={buyNgetN:'🎁 買N送N',fixedDiscount:'💰 固定折扣',percentDiscount:'📉 百分比折',bundle:'📦 套組定價',memberDiscount:'👤 身份折扣',staffPrice:'🏷️ 員工優惠價'};
+const PROMO_TYPE_LABEL={buyNgetN:'🎁 買N送N',tieredBundle:'📊 階梯買N送N',fixedDiscount:'💰 固定折扣',percentDiscount:'📉 百分比折',bundle:'📦 套組定價',memberDiscount:'👤 身份折扣',staffPrice:'🏷️ 員工優惠價'};
 
 let editPromos=[];
 
@@ -1885,7 +1885,7 @@ let editingPromoIdx=-1;
 function openPromoModal(idx){
   editingPromoIdx=idx===undefined?-1:idx;
   const p=editingPromoIdx>=0?editPromos[editingPromoIdx]:{};
-  const types=['buyNgetN','fixedDiscount','percentDiscount','bundle','memberDiscount','staffPrice'];
+  const types=['buyNgetN','tieredBundle','fixedDiscount','percentDiscount','bundle','memberDiscount','staffPrice'];
   document.getElementById('promoModalOverlay').classList.add('open');
   document.getElementById('promoModalBody').innerHTML=`
     <h3 style="margin:0 0 16px;">${editingPromoIdx>=0?'編輯':'新增'}促銷活動</h3>
@@ -1941,6 +1941,19 @@ function promoTypeChanged(){
     extra.innerHTML=`
       <div class="form-group"><label style="font-size:11px;font-weight:700;">買幾個（N）</label><input class="fg-input" type="number" id="pm_buyQty" value="${p.buyQty||6}" min="1"></div>
       <div class="form-group"><label style="font-size:11px;font-weight:700;">送幾個（N）</label><input class="fg-input" type="number" id="pm_freeQty" value="${p.freeQty||1}" min="1"></div>`;
+  } else if(type==='tieredBundle'){
+    extra.innerHTML=`
+      <div class="form-group" style="grid-column:1/-1;">
+        <label style="font-size:11px;font-weight:700;">階梯設定（每行一組，格式：買N送N=每組價格）</label>
+        <textarea class="fg-input" id="pm_staffPriceMap" rows="4"
+          style="font-family:monospace;font-size:12px;resize:vertical;"
+          placeholder="6送1=540&#10;12送2=1000">${p.staffPriceMap||''}</textarea>
+        <div style="font-size:10px;color:#aaa;margin-top:4px;">
+          第1行是第1組優惠，第2行起是第2組以上的優惠。<br>
+          散包（不滿第1組）按原價計算。<br>
+          例：買6送1=540（第1組540元）；12送2=1000（第2組起每12包含送1000元）
+        </div>
+      </div>`;
   } else if(type==='fixedDiscount'){
     extra.innerHTML=`<div class="form-group" style="grid-column:1/-1;"><label style="font-size:11px;font-weight:700;">折扣金額（元）</label><input class="fg-input" type="number" id="pm_discountValue" value="${p.discountValue||0}" min="0"></div>`;
   } else if(type==='percentDiscount'){
