@@ -1196,7 +1196,7 @@ function findCommRulesForProduct(product){
 }
 
 // calcComm：有填報哪個角色就給哪個角色抽成，沒填就是 0
-function calcComm(itemsStr, hasDoctor, hasStaff, hasNurse, hasPharma){
+function calcComm(itemsStr, hasDoctor, hasStaff, hasNurse, hasPharma, actualPriceMap){
   const products = getProducts();
   let dr=0,st=0,nu=0,ph=0;
   if(!itemsStr) return {dr,st,nu,ph};
@@ -1217,7 +1217,8 @@ function calcComm(itemsStr, hasDoctor, hasStaff, hasNurse, hasPharma){
     }) || products.find(p=>(p.name||'').trim()===shortName)
       || products.find(p=>(p.name||'').trim()===rawName.trim());
     if(!product) return;
-    lines.push({product, qty, price:product.price||0});
+    const actualP=actualPriceMap&&actualPriceMap[product.id]!==undefined?actualPriceMap[product.id]:(product.price||0);
+    lines.push({product, qty, price:actualP});
   });
 
   // ── Step2：對 salesAmount/threshold/salesStage 規則，
@@ -1539,14 +1540,31 @@ async function doCheckout(){
   const activePromos=getPromos().filter(p=>selectedMemberPromoIds.has(p.id));
   const isNoComm=activePromos.some(p=>p.noComm===true||p.noComm==='TRUE');
   const isNoCommDoctor=activePromos.some(p=>p.noCommDoctor===true||p.noCommDoctor==='TRUE');
+
+  // 建立實際結帳金額對應表（cat-name → 實際單包均價）
+  // 讓 salesAmount 用實際付款金額而非原價計算
+  const actualPriceMap={};
+  items.forEach(it=>{
+    if(it.isDiscount) return;
+    // 群組商品（蛋白代餐/Q飽）：用實際金額除以總包數得均價
+    if(it.group==='protein'||it.group==='mct'){
+      const grpPs=products.filter(p=>p.group===it.group&&(cart[p.id]||0)>0);
+      const grpTot=grpPs.reduce((s,p)=>s+(cart[p.id]||0),0);
+      const actualPerPack=grpTot>0?it.price/grpTot:0;
+      grpPs.forEach(p=>{ actualPriceMap[p.id]=actualPerPack; });
+    }
+  });
+
+  console.log('[actualPriceMap]', JSON.stringify(actualPriceMap));
+  console.log('[items]', items.map(i=>({name:i.name,price:i.price,group:i.group})));
   let cm;
   if(isNoComm){
     cm={dr:0,st:0,nu:0,ph:0};
   } else if(isNoCommDoctor){
-    const raw=calcComm(itemsStr,false,hasStaff,hasNurse,hasPharma); // 醫師傳 false
+    const raw=calcComm(itemsStr,false,hasStaff,hasNurse,hasPharma,actualPriceMap);
     cm={dr:0,st:raw.st,nu:raw.nu,ph:raw.ph};
   } else {
-    cm=calcComm(itemsStr,hasDoctor,hasStaff,hasNurse,hasPharma);
+    cm=calcComm(itemsStr,hasDoctor,hasStaff,hasNurse,hasPharma,actualPriceMap);
   }
   // 取得已選的顧客身份標記
   const activePromoLabels=[...new Set(
