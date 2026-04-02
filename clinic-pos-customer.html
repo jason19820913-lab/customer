@@ -617,6 +617,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
       }).catch(()=>{});
 
 
+    }catch(e){
       console.warn('[sync] 從 Sheet 載入失敗，使用本機快取', e.message);
     }
   }
