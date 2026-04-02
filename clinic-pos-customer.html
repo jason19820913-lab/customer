@@ -479,9 +479,25 @@ function getRemarks(){
 function renderPinRemarks(){
   const sel=document.getElementById('pinRemark');
   if(!sel) return;
+  // 先用 localStorage 現有資料顯示
   const cur=sel.value;
-  sel.innerHTML='<option value="">— 無備註 —</option>'+
-    getRemarks().map(r=>`<option value="${r}"${r===cur?' selected':''}>${r}</option>`).join('');
+  const fill=(remarks)=>{
+    sel.innerHTML='<option value="">— 無備註 —</option>'+
+      remarks.map(r=>`<option value="${r}"${r===cur?' selected':''}>${r}</option>`).join('');
+  };
+  fill(getRemarks());
+  // 同時從 Sheet 拉最新資料
+  if(gasUrl()){
+    gasRead('備註清單').then(rd=>{
+      if(rd?.status==='ok' && rd.rows?.length){
+        const remarks=rd.rows.map(r=>String(r['備註']||'').trim()).filter(Boolean);
+        if(remarks.length){
+          localStorage.setItem(REMARK_KEY,JSON.stringify(remarks));
+          fill(remarks);
+        }
+      }
+    }).catch(()=>{});
+  }
 }
 
 function getProducts(){
