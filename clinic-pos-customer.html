@@ -839,7 +839,7 @@ function buildItems(memberPromoOverride){
       if(!grpMatch&&scope!=='all') return;
       // 解析 _default_ 優惠價
       let defP=null;
-      (mp.staffPriceMap||'').split(/\n/).forEach(line=>{
+      (mp.staffPriceMap||'').replace(/\\n/g,'\n').split(/\n/).forEach(line=>{
         const m=line.trim().match(/^_default_=([\d.]+)$/);
         if(m) defP=Number(m[1]);
       });
@@ -869,7 +869,7 @@ function buildItems(memberPromoOverride){
       // 第1行：第1組規則；第2行：第2組起規則
       // 例：6送1=540 → 第1組7包540；12送2=1000 → 第2組起每14包1000
       const tiers=[];
-      (tieredPromo.staffPriceMap||'').split(/\n/).forEach(line=>{
+      (tieredPromo.staffPriceMap||'').replace(/\\n/g,'\n').split(/\n/).forEach(line=>{
         const m=line.trim().match(/^(\d+)送(\d+)=(\d+)$/);
         if(m) tiers.push({buy:Number(m[1]),free:Number(m[2]),setPrice:Number(m[3])});
       });
@@ -999,7 +999,7 @@ function buildItems(memberPromoOverride){
       // 解析 staffPriceMap：每行 "商品名稱=優惠價" 或 "_default_=優惠價"（套用到 scope 內所有商品）
       const priceMap={};
       let defaultPrice=null;
-      (memberPromo.staffPriceMap||'').split(/\n/).forEach(line=>{
+      (memberPromo.staffPriceMap||'').replace(/\\n/g,'\n').split(/\n/).forEach(line=>{
         const m=line.trim().match(/^(.+?)=([\d.]+)$/);
         if(!m) return;
         const key=m[1].trim(), val=Number(m[2]);
