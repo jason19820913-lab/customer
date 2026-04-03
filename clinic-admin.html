@@ -1422,12 +1422,24 @@ function fmtTime(v){
     try{
       const d=new Date(s);
       if(!isNaN(d)){
-        // GAS 把台灣時間直接放在 UTC 欄位（不轉換）
-        // 例：台灣 19:19 → 1899-12-29T19:19:00.000Z → 直接取 UTC = 19:19 ✓
-        const h=String(d.getUTCHours()).padStart(2,'0'),mi=String(d.getUTCMinutes()).padStart(2,'0');
-        return h+':'+mi;
+        // GAS 時間是 UTC，需 +8 轉台灣時間
+        // 例：2:21 UTC → +8 → 10:21 台灣；06:21 UTC → +8 → 14:21（下午2:21）台灣
+        const tw=new Date(d.getTime()+8*60*60*1000);
+        const h=tw.getUTCHours();
+        const mi=String(tw.getUTCMinutes()).padStart(2,'0');
+        const ampm=h<12?'上午':'下午';
+        const h12=h%12||12;
+        return `${ampm}${h12}:${mi}`;
       }
     }catch(e){}
+  }
+  // 本機存入格式（如「下午02:21」或「14:21」）直接轉換
+  const m12=s.match(/^(\d{1,2}):(\d{2})$/);
+  if(m12){
+    const h=parseInt(m12[1]),mi=m12[2];
+    const ampm=h<12?'上午':'下午';
+    const h12=h%12||12;
+    return `${ampm}${h12}:${mi}`;
   }
   return s;
 }
