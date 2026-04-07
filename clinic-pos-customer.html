@@ -109,6 +109,9 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
 .qty-btn{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--sage-light);background:#fff;color:var(--sage);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:700;transition:all .15s;line-height:1;flex-shrink:0;}
 .qty-btn:hover{background:var(--sage);color:#fff;border-color:var(--sage);}
 .qty-num{font-size:11px;font-weight:700;min-width:14px;text-align:center;}
+.qty-input{font-size:11px;font-weight:700;width:28px;text-align:center;border:none;background:transparent;color:var(--charcoal);padding:0;-moz-appearance:textfield;}
+.qty-input::-webkit-inner-spin-button,.qty-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
+.qty-input:focus{outline:1px solid var(--sage);border-radius:4px;background:#fff;}
 .package-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
 @media(max-width:380px){.package-grid{grid-template-columns:1fr;}}
 .pkg-card{border:2px solid #E8EEE9;border-radius:var(--r-sm);padding:12px;transition:all .2s;position:relative;}
@@ -713,9 +716,9 @@ function renderGrid(el,items){
       ${p.detail?`<div class="product-detail">${p.detail}</div>`:''}
       <div class="product-price">${p.group==='protein'||p.group==='mct'?'買6送1特惠':'NT$'+p.price.toLocaleString()}</div>
       <div class="qty-control" onclick="event.stopPropagation()">
-        <button class="qty-btn" onclick="chQty('${p.id}',-1)">−</button>
-        <span class="qty-num" id="qty-${p.id}">${cart[p.id]||0}</span>
-        <button class="qty-btn" onclick="chQty('${p.id}',1)">+</button>
+        <button class="qty-btn" onclick="event.stopPropagation();chQty('${p.id}',-1)">−</button>
+        <input class="qty-input" id="qty-${p.id}" type="number" min="0" value="${cart[p.id]||0}" onclick="event.stopPropagation()" oninput="setQty('${p.id}',this.value)" onfocus="this.select()">
+        <button class="qty-btn" onclick="event.stopPropagation();chQty('${p.id}',1)">+</button>
       </div>
     </div>`).join('');
 }
@@ -728,9 +731,9 @@ function renderPkgGrid(el,items){
       ${p.detail?`<div class="pkg-detail">${p.detail}</div>`:''}
       <div class="pkg-price">NT$ ${p.price.toLocaleString()} <span>/組</span></div>
       <div class="qty-control" style="margin-top:8px;" onclick="event.stopPropagation()">
-        <button class="qty-btn" onclick="chQty('${p.id}',-1)">−</button>
-        <span class="qty-num" id="qty-${p.id}">${cart[p.id]||0}</span>
-        <button class="qty-btn" onclick="chQty('${p.id}',1)">+</button>
+        <button class="qty-btn" onclick="event.stopPropagation();chQty('${p.id}',-1)">−</button>
+        <input class="qty-input" id="qty-${p.id}" type="number" min="0" value="${cart[p.id]||0}" onclick="event.stopPropagation()" oninput="setQty('${p.id}',this.value)" onfocus="this.select()">
+        <button class="qty-btn" onclick="event.stopPropagation();chQty('${p.id}',1)">+</button>
       </div>
     </div>`).join('');
 }
@@ -746,8 +749,14 @@ function switchTab(cat,btn){
 function toggle(id){if(!(cart[id]>0))chQty(id,1);}
 function chQty(id,d){
   cart[id]=Math.max(0,(cart[id]||0)+d);
-  const q=document.getElementById('qty-'+id);if(q)q.textContent=cart[id];
+  const q=document.getElementById('qty-'+id);if(q)q.value=cart[id];
   const c=document.getElementById('card-'+id);if(c)c.classList.toggle('selected',cart[id]>0);
+  renderSidebar();
+}
+function setQty(id,val){
+  const n=Math.max(0,parseInt(val)||0);
+  cart[id]=n;
+  const c=document.getElementById('card-'+id);if(c)c.classList.toggle('selected',n>0);
   renderSidebar();
 }
 
