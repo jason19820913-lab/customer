@@ -747,6 +747,11 @@ function json(o) {
     <div class="pm-form-grid full">
       <div class="fg"><label>分類介紹 <span style="font-size:9px;color:#888;">（顯示於前台分類頁頂端，同分類共用同一段介紹）</span></label><textarea id="pmCatDesc" rows="2" style="width:100%;resize:vertical;padding:8px;border:1px solid #dde4de;border-radius:8px;font-size:12px;font-family:inherit;" placeholder="例：每份含20克蛋白質+10克纖維，買6送1特惠"></textarea></div>
     </div>
+    <div class="pm-form-grid full">
+      <div class="fg"><label>條碼 <span style="font-size:9px;color:#888;">（掃描器掃入後可自動加入購物車，留空則不支援掃碼）</span></label>
+        <input type="text" id="pmBarcode" placeholder="例：4711234567890" style="font-family:monospace;">
+      </div>
+    </div>
     <div class="pm-modal-btns">
       <button class="btn btn-outline" onclick="closePmModal()">取消</button>
       <button class="btn btn-primary" onclick="savePmModal()">儲存</button>
@@ -796,7 +801,7 @@ function getProducts(){
 function saveProducts(p, silent=false){
   localStorage.setItem(PRODUCTS_KEY, JSON.stringify(p));
   if(!gasUrl()) return;
-  const PRODUCT_HDR=['id','cat','name','emoji','price','group','detail','badge','active','catDescription'];
+  const PRODUCT_HDR=['id','cat','name','emoji','price','group','detail','badge','active','catDescription','barcode'];
   const rows=p.map(x=>({id:x.id||'',cat:x.cat||'',name:x.name||'',emoji:x.emoji||'',
     price:x.price||0,group:x.group||'',detail:x.detail||'',badge:x.badge||'',
     active:x.active===false?'FALSE':'TRUE'}));
@@ -1962,9 +1967,10 @@ function openProductModal(id=null,defaultCat=''){
     document.getElementById('pmDetail').value=p.detail||'';
     document.getElementById('pmBadge').value=p.badge||'';updateBadgePreview();
     document.getElementById('pmCatDesc').value=p.catDescription||'';
+    document.getElementById('pmBarcode').value=p.barcode||'';
   }else{
     document.getElementById('pmModalTitle').textContent='新增商品';
-    ['pmName','pmEmoji','pmDetail','pmBadge','pmCatDesc'].forEach(i=>document.getElementById(i).value='');updateBadgePreview();
+    ['pmName','pmEmoji','pmDetail','pmBadge','pmCatDesc','pmBarcode'].forEach(i=>document.getElementById(i).value='');updateBadgePreview();
     document.getElementById('pmPrice').value='';
     document.getElementById('pmGroup').value='other';
   }
