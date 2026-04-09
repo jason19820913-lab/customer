@@ -2009,15 +2009,16 @@ function savePmModal(){
   const detail=document.getElementById('pmDetail').value.trim();
   const badge=document.getElementById('pmBadge').value.trim();
   const catDescription=document.getElementById('pmCatDesc').value.trim();
+  const barcode=document.getElementById('pmBarcode').value.trim();
 
   const products=getProducts();
   if(editingProductId){
     const idx=products.findIndex(p=>p.id===editingProductId);
-    if(idx>=0){products[idx]={...products[idx],cat,name,emoji,price,group,detail:detail||undefined,badge:badge||undefined,catDescription:catDescription||undefined};}
+    if(idx>=0){products[idx]={...products[idx],cat,name,emoji,price,group,detail:detail||undefined,badge:badge||undefined,catDescription:catDescription||undefined,barcode:barcode||undefined};}
   }else{
     const newId='custom_'+Date.now();
     const newP={cat,id:newId,emoji,name,price,group,active:true};
-    if(detail)newP.detail=detail;if(badge)newP.badge=badge;if(catDescription)newP.catDescription=catDescription;
+    if(detail)newP.detail=detail;if(badge)newP.badge=badge;if(catDescription)newP.catDescription=catDescription;if(barcode)newP.barcode=barcode;
     products.push(newP);
   }
   saveProducts(products);renderProductManager();closePmModal();
