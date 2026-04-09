@@ -709,7 +709,47 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   buildProductUI();
   renderPresetBtns();
   renderSidebar();
+
+  // ── 條碼掃描監聽 ──
+  let _bc='', _bcTimer=null, _bcLast=0;
+  document.addEventListener('keydown', function(e){
+    const tag=(document.activeElement||{}).tagName||'';
+    const typ=(document.activeElement||{}).type||'';
+    // 只有在 number input 或無焦點時才攔截
+    if(tag==='INPUT' && typ!=='number') return;
+    if(tag==='TEXTAREA'||tag==='SELECT') return;
+
+    const now=Date.now();
+    if(e.key==='Enter'){
+      if(_bc.length>=3) handleBarcodeScan(_bc);
+      _bc=''; clearTimeout(_bcTimer); _bcLast=0;
+      e.preventDefault();
+      return;
+    }
+    // 間隔超過150ms且已有緩衝，視為新一輪輸入
+    if(now-_bcLast>150 && _bc.length>0) _bc='';
+    _bcLast=now;
+    if(e.key.length===1){
+      _bc+=e.key;
+      clearTimeout(_bcTimer);
+      _bcTimer=setTimeout(function(){ _bc=''; }, 300);
+    }
+  });
 });
+
+function handleBarcodeScan(code){
+  const products=getProducts().filter(function(p){return p.active!==false;});
+  const found=products.find(function(p){return String(p.barcode||'').trim()===code.trim();});
+  if(!found){
+    toast('⚠️ 找不到條碼：'+code);
+    return;
+  }
+  chQty(found.id, 1);
+  // 切換到對應分類
+  const tabs=document.querySelectorAll('.tab-btn');
+  tabs.forEach(function(t){ if(t.dataset.cat===found.cat) t.click(); });
+  toast('✅ 掃入：'+found.name+' (共'+( (cart[found.id]||0) )+'件)');
+}
 
 /* ── PRODUCT UI ── */
 function getQuickPicks(){
