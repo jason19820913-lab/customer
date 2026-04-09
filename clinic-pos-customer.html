@@ -315,7 +315,7 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
           </div>
           <div class="form-group">
             <label>病歷號 <span style="color:#c62828;">*</span></label>
-            <input class="fg-input" type="text" id="chartNumber" placeholder="請輸入病歷號" oninput="renderSidebar()">
+            <input class="fg-input" type="text" id="chartNumber" placeholder="請輸入病歷號" oninput="onChartInput(this.value)">
           </div>
         </div>
         <!-- 隱藏的員工欄位，由密碼 modal 填入 -->
@@ -330,6 +330,11 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
     <div class="card">
       <div class="card-header"><span class="card-header-icon">🧁</span><span class="card-header-title">STEP 2 ── 商品選購</span></div>
       <div class="card-body">
+        <div id="quickPicksArea" style="margin-bottom:12px;display:none;">
+          <div style="font-size:11px;font-weight:700;color:var(--brown);margin-bottom:7px;">⚡ 快選方案</div>
+          <div id="quickPicksBtns" style="display:flex;flex-wrap:wrap;gap:7px;"></div>
+        </div>
+        <div id="presetBtns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
         <div class="tabs" id="productTabs"></div>
         <div id="productPanels"></div>
       </div>
@@ -375,6 +380,11 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
 
     <!-- 步驟B：員工選擇 -->
     <div id="staffStep" style="display:none;">
+      <!-- 記住當班人員 -->
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;padding:8px 12px;background:#F0F5F1;border-radius:10px;">
+        <input type="checkbox" id="rememberStaff" style="width:15px;height:15px;cursor:pointer;accent-color:var(--sage);">
+        <label for="rememberStaff" style="font-size:12px;color:var(--brown);cursor:pointer;">記住今日當班人員（下位顧客自動帶入）</label>
+      </div>
       <!-- 備註（在醫師前） -->
       <div class="form-group" style="margin-bottom:14px;">
         <label style="font-size:12px;color:var(--brown);font-weight:700;">📋 備註 <span style="color:#aaa;font-weight:400;font-size:11px;">(選填)</span></label>
@@ -492,7 +502,14 @@ function renderPinRemarks(){
   fill(getRemarks());
   // 同時從 Sheet 拉最新資料
   if(gasUrl()){
-    gasRead('備註清單').then(rd=>{
+    // 快選方案（非同步）
+  gasRead('快選方案').then(d=>{
+    if(d?.status==='ok'&&d.rows?.length){
+      const presets=d.rows.map(r=>({name:String(r['名稱']||''),items:String(r['商品清單']||'')})).filter(p=>p.name);
+      if(presets.length){localStorage.setItem(PRESET_KEY,JSON.stringify(presets));renderPresetBtns();}
+    }
+  }).catch(()=>{});
+  gasRead('備註清單').then(rd=>{
       if(rd?.status==='ok' && rd.rows?.length){
         const remarks=rd.rows.map(r=>String(r['備註']||'').trim()).filter(Boolean);
         if(remarks.length){
@@ -501,6 +518,46 @@ function renderPinRemarks(){
         }
       }
     }).catch(()=>{});
+  }
+}
+
+const PRESET_KEY='clinicPresets';
+function getPresets(){try{const s=localStorage.getItem(PRESET_KEY);return s?JSON.parse(s):[];}catch(e){return[];}}
+
+function renderPresetBtns(){
+  const el=document.getElementById('presetBtns');
+  if(!el) return;
+  const presets=getPresets();
+  if(!presets.length){el.style.display='none';return;}
+  el.style.display='flex';
+  el.innerHTML=presets.map((p,i)=>`
+    <button onclick="applyPreset(${i})"
+      style="padding:5px 14px;background:#fff;border:1.5px solid var(--sage);border-radius:20px;font-family:inherit;font-size:12px;font-weight:600;color:var(--sage);cursor:pointer;transition:all .15s;"
+      onmouseover="this.style.background='var(--sage)';this.style.color='#fff'"
+      onmouseout="this.style.background='#fff';this.style.color='var(--sage)'">
+      ⚡ ${p.name}
+    </button>`).join('');
+}
+
+function applyPreset(idx){
+  const presets=getPresets();
+  const p=presets[idx];
+  if(!p) return;
+  const products=getProducts().filter(q=>q.active!==false);
+  let applied=0;
+  p.items.split(/\n/).forEach(line=>{
+    const m=line.trim().match(/^(.+?)=(\d+)$/);
+    if(!m) return;
+    const name=m[1].trim(), qty=parseInt(m[2])||1;
+    const prod=products.find(pr=>(pr.name||'').trim()===name);
+    if(prod){ cart[prod.id]=qty; applied++; }
+  });
+  if(applied>0){
+    buildProductUI();
+    renderSidebar();
+    toast(`⚡ 已套用「${p.name}」（${applied}種商品）`);
+  } else {
+    toast('⚠️ 找不到對應商品，請確認商品名稱');
   }
 }
 
@@ -535,7 +592,12 @@ function promoMatchesProduct(promo, product){
   return false;
 }
 
-function renderClinicSelect(){const s=document.getElementById('clinicSelect');const cur=s.value;s.innerHTML='<option value="">請選擇院區</option>'+getClinics().map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');}
+function renderClinicSelect(){
+  const s=document.getElementById('clinicSelect');
+  const cur=s.value||localStorage.getItem('lastClinic')||'';
+  s.innerHTML='<option value="">請選擇院區</option>'+getClinics().map(cl=>`<option${cl===cur?' selected':''}>${cl}</option>`).join('');
+  if(cur&&!s.value) s.value=cur; // 自動帶入上次院區
+}
 
 /* ── GAS 通用 API 輔助函數 ── */
 function gasUrl(){return (typeof APP_CONFIG!=='undefined'?APP_CONFIG.GAS_URL:null)||localStorage.getItem(GS_KEY)||'';}
@@ -645,10 +707,37 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   if(loadingBanner) loadingBanner.style.display='none';
   renderClinicSelect();
   buildProductUI();
+  renderPresetBtns();
   renderSidebar();
 });
 
 /* ── PRODUCT UI ── */
+function getQuickPicks(){
+  try{const s=localStorage.getItem('clinicQuickPicks');return s?JSON.parse(s):[];}catch(e){return[];}
+}
+function renderQuickPicks(){
+  const picks=getQuickPicks();
+  const area=document.getElementById('quickPicksArea');
+  const btns=document.getElementById('quickPicksBtns');
+  if(!area||!btns) return;
+  if(!picks.length){area.style.display='none';return;}
+  area.style.display='block';
+  btns.innerHTML=picks.map((pk,i)=>`
+    <button onclick="applyQuickPick(${i})"
+      style="padding:6px 14px;background:#fff;border:1.5px solid var(--sage);border-radius:20px;font-family:inherit;font-size:12px;font-weight:600;color:var(--sage);cursor:pointer;transition:all .15s;"
+      onmouseover="this.style.background='var(--sage)';this.style.color='#fff'"
+      onmouseout="this.style.background='#fff';this.style.color='var(--sage)'">
+      ⚡ ${pk.name}
+    </button>`).join('');
+}
+function applyQuickPick(idx){
+  const picks=getQuickPicks();
+  const pk=picks[idx];
+  if(!pk) return;
+  Object.entries(pk.items||{}).forEach(([id,qty])=>{ cart[id]=qty; });
+  buildProductUI();
+  renderSidebar();
+}
 function buildProductUI(){
   const products=getProducts().filter(p=>p.active!==false);
   const cats=[],groups={};
@@ -846,8 +935,47 @@ document.addEventListener('mousedown',e=>{
     dd.classList.remove('open');
   });
 });
-function onStaffChange(){document.getElementById('doctorBadge').textContent=document.getElementById('doctorSelect').value||'尚未設定醫師';renderSidebar();}
+function onStaffChange(){document.getElementById('doctorBadge').textContent=document.getElementById('doctorSelect').value||'尚未設定醫師';const cl=document.getElementById('clinicSelect').value;if(cl)localStorage.setItem('lastClinic',cl);renderSidebar();}
 function onCustomerChange(){renderSidebar();}
+
+async function lookupPatientName(){
+  const chartNum=document.getElementById('chartNumber').value.trim();
+  const nameEl=document.getElementById('customerName');
+  const hint=document.getElementById('patientLookupHint');
+  if(!chartNum||!gasUrl()||nameEl.value.trim()) return;
+  if(hint) hint.style.display='block', hint.textContent='🔍 查詢中...';
+  try{
+    const d=await gasRead('銷售紀錄');
+    if(d.status==='ok'&&d.rows){
+      // 找最近一筆相同病歷號的顧客姓名
+      const match=d.rows.slice().reverse().find(r=>{
+        const phone=String(r['病歷號']||'').trim().replace(/^'+/,'');
+        return phone===chartNum;
+      });
+      if(match&&match['顧客姓名']){
+        nameEl.value=match['顧客姓名'];
+        if(hint) hint.textContent='✅ 已帶入：'+match['顧客姓名'];
+        onCustomerChange();
+      } else {
+        if(hint) hint.textContent='（查無此病歷號紀錄）';
+        setTimeout(()=>{if(hint)hint.style.display='none';},2000);
+      }
+    }
+  }catch(e){
+    if(hint) hint.style.display='none';
+  }
+}
+function onChartInput(val){
+  renderSidebar();
+  if(!val||val.length<2) return;
+  // 從本機紀錄查詢此病歷號的顧客姓名
+  const log=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
+  const found=log.filter(e=>String(e.phone||'').trim()===val.trim()).sort((a,b)=>a.date<b.date?1:-1)[0];
+  if(found&&found.customer){
+    const nameEl=document.getElementById('customerName');
+    if(nameEl&&!nameEl.value){ nameEl.value=found.customer; renderSidebar(); }
+  }
+}
 
 /* ── SIDEBAR ── */
 function buildItems(memberPromoOverride){
@@ -1347,13 +1475,15 @@ function verifyPin(){
   document.getElementById('pinModalTitle').textContent='選擇當班人員';
   document.getElementById('pinModalMsg').textContent='請填寫當班人員資訊（可部分填寫）';
   document.getElementById('staffStep').style.display='';
-  // 重置員工欄位 + 身份折扣
+  // 重置身份折扣，並帶入上次當班人員
   selectedMemberPromoIds=new Set();
+  const lastStaffMap={Doctor:'lastDoctor',Staff:'lastStaff',Nurse:'lastNurse',Pharma:'lastPharma'};
   ['Doctor','Staff','Nurse','Pharma'].forEach(r=>{
     const inp=document.getElementById('staff'+r);
     const val=document.getElementById('staff'+r+'Val');
-    if(inp) inp.value='';
-    if(val) val.value='';
+    const last=localStorage.getItem(lastStaffMap[r])||'';
+    if(inp) inp.value=last;
+    if(val) val.value=last;
   });
   // 若 localStorage 沒有人員資料，先從 Sheet 同步再顯示
   const staffData=getStaff();
@@ -1570,6 +1700,17 @@ async function doCheckout(){
   const chartNum=document.getElementById('chartNumber').value.trim();
   payMethod=document.getElementById('pinPayMethod').value;
   const remark=document.getElementById('pinRemark')?.value||'';
+  // 記住當班人員
+  if(document.getElementById('rememberStaff')?.checked){
+    localStorage.setItem('lastStaff',JSON.stringify({
+      Doctor:document.getElementById('staffDoctorVal').value||'',
+      Staff:document.getElementById('staffStaffVal').value||'',
+      Nurse:document.getElementById('staffNurseVal').value||'',
+      Pharma:document.getElementById('staffPharmaVal').value||''
+    }));
+  } else {
+    localStorage.removeItem('lastStaff');
+  }
   const now=new Date();
   const date=now.toLocaleDateString('zh-TW');
   const time=now.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
@@ -1620,6 +1761,11 @@ async function doCheckout(){
   const activePromoLabels=[...new Set(
     getPromos().filter(p=>selectedMemberPromoIds.has(p.id)).map(p=>(p.memberLabel||p.name).trim())
   )].join('、');
+  // 記住當班人員（下一位顧客自動帶入）
+  if(doctor) localStorage.setItem('lastDoctor',doctor);
+  if(staffV) localStorage.setItem('lastStaff',staffV);
+  if(nurseV) localStorage.setItem('lastNurse',nurseV);
+  if(pharmaV) localStorage.setItem('lastPharma',pharmaV);
   const entry={date,time,clinic,customer,phone:chartNum,doctor,staff:staffV,nurse:nurseV,pharma:pharmaV,
     items:itemsStr,itemQty,total,payMethod,remark,identity:activePromoLabels,
     doctorComm:cm.dr,staffComm:cm.st,nurseComm:cm.nu,pharmaComm:cm.ph,idHash:'',idMask:''};
@@ -1683,7 +1829,9 @@ function closeModal(){
   document.getElementById('modal').classList.remove('open');
   cart={};
   ['customerName','chartNumber'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
-  document.getElementById('clinicSelect').value='';
+  // 記住院區，不清空
+  const lastClinic=document.getElementById('clinicSelect').value;
+  if(lastClinic) localStorage.setItem('lastClinic',lastClinic);
   ['Doctor','Staff','Nurse','Pharma'].forEach(r=>{
     const inp=document.getElementById('staff'+r);const val=document.getElementById('staff'+r+'Val');
     if(inp)inp.value='';if(val)val.value='';
