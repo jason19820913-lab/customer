@@ -311,7 +311,10 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
           </div>
           <div class="form-group">
             <label>顧客姓名</label>
-            <input class="fg-input" type="text" id="customerName" placeholder="請輸入顧客姓名" oninput="onCustomerChange()">
+            <div style="position:relative;">
+              <input class="fg-input" type="text" id="customerName" placeholder="請輸入顧客姓名" oninput="onNameInput(this.value)" autocomplete="off">
+              <div id="nameSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid #D0DEAD;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:200;max-height:180px;overflow-y:auto;"></div>
+            </div>
           </div>
           <div class="form-group">
             <label>病歷號 <span style="color:#c62828;">*</span></label>
@@ -985,6 +988,115 @@ document.addEventListener('mousedown',e=>{
 });
 function onStaffChange(){document.getElementById('doctorBadge').textContent=document.getElementById('doctorSelect').value||'尚未設定醫師';const cl=document.getElementById('clinicSelect').value;if(cl)localStorage.setItem('lastClinic',cl);renderSidebar();}
 function onCustomerChange(){renderSidebar();}
+
+let _nameSearchTimer=null;
+function onNameInput(val){
+  renderSidebar();
+  const sugg=document.getElementById('nameSuggestions');
+  if(!sugg) return;
+  if(!val||val.length<1){ sugg.style.display='none'; return; }
+
+  // 先用本機快取即時顯示
+  showNameSuggestions(val, false);
+
+  // 防抖：停止輸入 400ms 後從 Sheet 查詢
+  clearTimeout(_nameSearchTimer);
+  _nameSearchTimer=setTimeout(function(){
+    showNameSuggestions(val, true);
+  }, 400);
+}
+
+async function showNameSuggestions(val, fromSheet){
+  const sugg=document.getElementById('nameSuggestions');
+  if(!sugg) return;
+
+  // 先從本機紀錄撈（key: "姓名|病歷號"，去重）
+  const map={};
+  const log=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
+  log.forEach(function(e){
+    if(!e.customer||!e.phone) return;
+    const name=String(e.customer).trim();
+    const phone=String(e.phone).trim();
+    if(name.includes(val)){
+      const key=name+'|'+phone;
+      if(!map[key]||e.date>map[key].date) map[key]={name,phone,date:e.date};
+    }
+  });
+
+  // 從 Sheet 查詢（覆蓋補充）
+  if(fromSheet && gasUrl()){
+    try{
+      const d=await gasRead('銷售紀錄');
+      if(d.status==='ok' && d.rows){
+        d.rows.forEach(function(r){
+          const name=String(r['顧客姓名']||'').trim();
+          const phone=String(r['病歷號']||'').trim().replace(/^'+/,'');
+          if(!name||!phone) return;
+          if(name.includes(val)){
+            const key=name+'|'+phone;
+            if(!map[key]) map[key]={name,phone,date:r['日期']||''};
+          }
+        });
+      }
+    }catch(e){}
+  }
+
+  const matches=Object.values(map)
+    .sort(function(a,b){return a.name.localeCompare(b.name,'zh-TW');})
+    .slice(0,8);
+
+  if(!matches.length){ sugg.style.display='none'; return; }
+  sugg.style.display='block';
+  sugg.innerHTML='';
+
+  // 同姓名多病歷號：姓名相同的歸在一起
+  const grouped={};
+  matches.forEach(function(m){
+    if(!grouped[m.name]) grouped[m.name]=[];
+    grouped[m.name].push(m.phone);
+  });
+
+  Object.keys(grouped).forEach(function(name){
+    const phones=grouped[name];
+    phones.forEach(function(phone){
+      const div=document.createElement('div');
+      div.style.cssText='padding:10px 14px;cursor:pointer;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center;';
+      const nameSpan=document.createElement('span');
+      nameSpan.style.cssText='font-size:13px;font-weight:600;';
+      nameSpan.textContent=name;
+      const phoneSpan=document.createElement('span');
+      phoneSpan.style.cssText='font-size:11px;color:#888;background:#F0F5F1;padding:2px 8px;border-radius:8px;';
+      phoneSpan.textContent='病歷號：'+phone;
+      div.appendChild(nameSpan);
+      div.appendChild(phoneSpan);
+      div.addEventListener('mouseover',function(){this.style.background='#F0F5F1';});
+      div.addEventListener('mouseout',function(){this.style.background='#fff';});
+      div.addEventListener('mousedown',function(ev){
+        ev.preventDefault();
+        selectPatient(name, phone);
+      });
+      sugg.appendChild(div);
+    });
+  });
+}
+
+function selectPatient(name, phone){
+  const nameEl=document.getElementById('customerName');
+  const chartEl=document.getElementById('chartNumber');
+  const sugg=document.getElementById('nameSuggestions');
+  if(nameEl) nameEl.value=name;
+  if(chartEl && !chartEl.value) chartEl.value=phone;
+  else if(chartEl) chartEl.value=phone;
+  if(sugg) sugg.style.display='none';
+  renderSidebar();
+}
+
+// 點擊其他地方關閉建議
+document.addEventListener('click', function(e){
+  const sugg=document.getElementById('nameSuggestions');
+  const nameEl=document.getElementById('customerName');
+  if(sugg && !sugg.contains(e.target) && e.target!==nameEl) sugg.style.display='none';
+});
 
 async function lookupPatientName(){
   const chartNum=document.getElementById('chartNumber').value.trim();
