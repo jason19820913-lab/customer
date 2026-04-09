@@ -476,6 +476,14 @@ tbody tr:hover td{background:var(--sage-pale);}
     <div class="page-title">系統設定</div>
     <div class="page-sub">Google Sheets 串接、人員名單、PIN 碼、備註選項</div>
 
+    <!-- 快選方案管理 -->
+    <div class="sc">
+      <h3>⚡ 快選方案</h3>
+      <p>設定常用商品組合，前台一鍵加入購物車。格式：商品名稱=數量，每行一筆。</p>
+      <div id="presetList" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px;"></div>
+      <button class="btn btn-primary" onclick="addPreset()" style="width:100%;">＋ 新增快選方案</button>
+    </div>
+
     <!-- 備註選項管理 -->
     <div class="sc">
       <h3>📋 備註選項管理</h3>
@@ -486,6 +494,17 @@ tbody tr:hover td{background:var(--sage-pale);}
         <button class="btn btn-primary" onclick="addRemark()" style="white-space:nowrap;">＋ 新增</button>
       </div>
       <div id="remarkChips" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+    </div>
+
+    <!-- 快選方案管理 -->
+    <div class="sc">
+      <h3>⚡ 快選方案管理</h3>
+      <p>前台「商品選購」上方的一鍵快選按鈕，適合固定療程組合。</p>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <input type="text" id="newPickName" class="fg-input" placeholder="方案名稱（例：蛋白代餐月療程）" style="flex:1;">
+        <button class="btn btn-primary" onclick="openPickEditor()" style="white-space:nowrap;">＋ 新增方案</button>
+      </div>
+      <div id="quickPicksList" style="display:flex;flex-direction:column;gap:8px;"></div>
     </div>
 
     <!-- GS -->
@@ -813,6 +832,7 @@ async function initApp(){
   renderProductManager();
   loadPromoData(); loadCommData();
   renderRemarkChips();
+  renderQuickPicksList();
   const u = gasUrl();
   if(u){ document.getElementById('gsUrlInput').value=u; document.getElementById('gsBadge').classList.add('show'); }
   document.getElementById('statsDateLabel').textContent=new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'short'})+' 銷售概覽';
@@ -878,6 +898,13 @@ async function initApp(){
     }
 
 
+    // 快選方案
+    gasRead('快選方案').then(d=>{
+      if(d?.status==='ok'&&d.rows?.length){
+        const presets=d.rows.map(r=>({name:String(r['名稱']||''),items:String(r['商品清單']||'')})).filter(p=>p.name);
+        if(presets.length){localStorage.setItem(PRESET_KEY,JSON.stringify(presets));renderPresetList();}
+      }
+    }).catch(()=>{});
     console.info('[initApp] 已從 Sheet 同步所有資料');
     toast('☁️ 資料已從 Google Sheet 同步');
 
@@ -893,6 +920,7 @@ async function initApp(){
         gasWrite('備註清單',['備註'],rows).then(()=>{
           toast('📋 已自動建立備註清單');
           renderRemarkChips();
+  renderQuickPicksList();
         }).catch(()=>{});
       }
     }).catch(()=>{});
@@ -939,6 +967,157 @@ function resetMgmtSession(){
   mgmtPinVerified=false;
 }
 
+// ── 快選方案管理 ──
+function getQuickPicks(){
+  try{const s=localStorage.getItem('clinicQuickPicks');return s?JSON.parse(s):[];}catch(e){return[];}
+}
+function saveQuickPicks(arr){localStorage.setItem('clinicQuickPicks',JSON.stringify(arr));}
+
+function renderQuickPicksList(){
+  const el=document.getElementById('quickPicksList');
+  if(!el) return;
+  const picks=getQuickPicks();
+  if(!picks.length){el.innerHTML='<div style="font-size:12px;color:#aaa;">尚無快選方案</div>';return;}
+  el.innerHTML=picks.map((pk,i)=>`
+    <div style="background:#F0F5F1;border:1.5px solid #D0DEAD;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <div>
+        <div style="font-size:13px;font-weight:700;">⚡ ${pk.name}</div>
+        <div style="font-size:11px;color:#888;margin-top:2px;">${Object.entries(pk.items||{}).map(([id,q])=>{const p=getAdminProducts().find(x=>x.id===id);return p?p.name+'×'+q:id+'×'+q;}).join('、')}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0;">
+        <button onclick="editPick(${i})" style="font-size:11px;padding:4px 10px;border:1px solid #ccc;border-radius:7px;background:#fff;cursor:pointer;">編輯</button>
+        <button onclick="deletePick(${i})" style="font-size:11px;padding:4px 10px;border:1px solid #ffcdd2;border-radius:7px;background:#fff;color:#c62828;cursor:pointer;">刪除</button>
+      </div>
+    </div>`).join('');
+}
+
+let editingPickIdx=-1;
+function openPickEditor(idx){
+  editingPickIdx=idx!==undefined?idx:-1;
+  const picks=getQuickPicks();
+  const pk=editingPickIdx>=0?picks[editingPickIdx]:{name:'',items:{}};
+  const nameInp=document.getElementById('newPickName');
+  if(nameInp) nameInp.value=pk.name;
+  // 用 modal 選商品
+  const products=getAdminProducts().filter(p=>p.active!==false);
+  const modal=document.createElement('div');
+  modal.id='pickEditorModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:600;display:flex;align-items:center;justify-content:center;padding:14px;';
+  modal.innerHTML=`
+    <div style="background:#fff;border-radius:16px;padding:20px;max-width:500px;width:100%;max-height:80vh;overflow-y:auto;">
+      <h3 style="margin:0 0 14px;">${editingPickIdx>=0?'編輯':'新增'}快選方案</h3>
+      <div class="form-group" style="margin-bottom:14px;">
+        <label style="font-size:11px;font-weight:700;">方案名稱</label>
+        <input class="fg-input" id="pickEditorName" value="${pk.name}" placeholder="例：蛋白代餐月療程">
+      </div>
+      <div style="font-size:11px;font-weight:700;color:var(--brown);margin-bottom:8px;">商品數量（0=不加入）</div>
+      <div style="display:grid;gap:6px;">
+        ${products.map(p=>`
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#F8FAF8;border-radius:8px;">
+            <span style="font-size:12px;">${p.emoji||'📦'} ${p.cat?p.cat+'-':''}${p.name}</span>
+            <input type="number" min="0" value="${pk.items[p.id]||0}"
+              id="pick_qty_${p.id}" style="width:50px;text-align:center;border:1px solid #D0DEAD;border-radius:6px;padding:3px;font-size:12px;">
+          </div>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px;">
+        <button onclick="document.getElementById('pickEditorModal').remove()" style="flex:1;padding:10px;border:1.5px solid #ddd;border-radius:10px;background:#fff;cursor:pointer;font-size:13px;">取消</button>
+        <button onclick="savePickEditor()" style="flex:2;padding:10px;border:none;border-radius:10px;background:var(--sage);color:#fff;cursor:pointer;font-size:13px;font-weight:700;">儲存方案</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function savePickEditor(){
+  const name=document.getElementById('pickEditorName')?.value.trim();
+  if(!name){toast('⚠️ 請輸入方案名稱');return;}
+  const products=getAdminProducts().filter(p=>p.active!==false);
+  const items={};
+  products.forEach(p=>{
+    const q=parseInt(document.getElementById('pick_qty_'+p.id)?.value)||0;
+    if(q>0) items[p.id]=q;
+  });
+  if(!Object.keys(items).length){toast('⚠️ 請至少設定一項商品');return;}
+  const picks=getQuickPicks();
+  const pk={name,items};
+  if(editingPickIdx>=0) picks[editingPickIdx]=pk;
+  else picks.push(pk);
+  saveQuickPicks(picks);
+  document.getElementById('pickEditorModal')?.remove();
+  renderQuickPicksList();
+  toast('✅ 快選方案已儲存');
+}
+
+function editPick(idx){ openPickEditor(idx); }
+function deletePick(idx){
+  if(!confirm('確定刪除此方案？')) return;
+  const picks=getQuickPicks();
+  picks.splice(idx,1);
+  saveQuickPicks(picks);
+  renderQuickPicksList();
+  toast('🗑️ 已刪除');
+}
+
+// ── 快選方案 ──
+const PRESET_KEY='clinicPresets';
+function getPresets(){try{const s=localStorage.getItem(PRESET_KEY);return s?JSON.parse(s):[];}catch(e){return[];}}
+function savePresets(arr){
+  localStorage.setItem(PRESET_KEY,JSON.stringify(arr));
+  if(gasUrl()){
+    gasWrite('快選方案',['名稱','商品清單'],arr.map(p=>({'名稱':p.name,'商品清單':p.items})))
+      .catch(()=>{});
+  }
+}
+function renderPresetList(){
+  const el=document.getElementById('presetList');
+  if(!el) return;
+  const presets=getPresets();
+  if(!presets.length){el.innerHTML='<div style="font-size:11px;color:#aaa;">尚無快選方案</div>';return;}
+  el.innerHTML=presets.map((p,i)=>`
+    <div style="background:#F8FBF8;border:1.5px solid #D0DEAD;border-radius:10px;padding:10px 14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <strong style="font-size:13px;">${p.name}</strong>
+        <div style="display:flex;gap:6px;">
+          <button onclick="editPreset(${i})" style="font-size:11px;padding:2px 10px;border:1px solid #D0DEAD;border-radius:8px;background:#fff;cursor:pointer;">編輯</button>
+          <button onclick="deletePreset(${i})" style="font-size:11px;padding:2px 10px;border:1px solid #ffcdd2;border-radius:8px;background:#fff;color:#c62828;cursor:pointer;">刪除</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#888;font-family:monospace;">${p.items}</div>
+    </div>`).join('');
+}
+function addPreset(){
+  const name=prompt('方案名稱（例：回診套組）');
+  if(!name) return;
+  const items=prompt('商品清單（每行：商品名稱=數量）
+例：黑芝麻豆奶=7
+好燃對策=1');
+  if(!items) return;
+  const presets=getPresets();
+  presets.push({name:name.trim(),items:items.trim()});
+  savePresets(presets);
+  renderPresetList();
+  toast('✅ 快選方案「'+name+'」已儲存');
+}
+function editPreset(idx){
+  const presets=getPresets();
+  const p=presets[idx];
+  const name=prompt('方案名稱',p.name);
+  if(!name) return;
+  const items=prompt('商品清單',p.items);
+  if(!items) return;
+  presets[idx]={name:name.trim(),items:items.trim()};
+  savePresets(presets);
+  renderPresetList();
+  toast('✅ 已更新');
+}
+function deletePreset(idx){
+  if(!confirm('確定刪除此方案？')) return;
+  const presets=getPresets();
+  presets.splice(idx,1);
+  savePresets(presets);
+  renderPresetList();
+  toast('🗑️ 已刪除');
+}
+
 function getRemarks(){
   try{const s=localStorage.getItem(REMARK_KEY);return s?JSON.parse(s):[...DEFAULT_REMARKS];}catch(e){return[...DEFAULT_REMARKS];}
 }
@@ -976,6 +1155,7 @@ function addRemark(){
   saveRemarks(remarks);
   inp.value='';
   renderRemarkChips();
+  renderQuickPicksList();
   toast('✅ 備註「'+val+'」已新增');
 }
 
@@ -984,6 +1164,7 @@ function removeRemark(idx){
   const removed=remarks.splice(idx,1)[0];
   saveRemarks(remarks);
   renderRemarkChips();
+  renderQuickPicksList();
   toast('🗑️ 已刪除「'+removed+'」');
 }
 
@@ -997,7 +1178,7 @@ function switchPage(p){
   if(p==='comm')renderCommPage();
   // 切回一般頁面時重置管理驗證
   if(p==='stats'||p==='patient') mgmtPinVerified=false;
-  if(p==='settings') renderRemarkChips();
+  if(p==='settings'){ renderRemarkChips(); renderQuickPicksList(); }
 }
 
 // ── STATS ──
