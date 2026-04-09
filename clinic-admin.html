@@ -1003,27 +1003,25 @@ function openPickEditor(idx){
   const modal=document.createElement('div');
   modal.id='pickEditorModal';
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:600;display:flex;align-items:center;justify-content:center;padding:14px;';
-  modal.innerHTML=`
-    <div style="background:#fff;border-radius:16px;padding:20px;max-width:500px;width:100%;max-height:80vh;overflow-y:auto;">
-      <h3 style="margin:0 0 14px;">${editingPickIdx>=0?'編輯':'新增'}快選方案</h3>
-      <div class="form-group" style="margin-bottom:14px;">
-        <label style="font-size:11px;font-weight:700;">方案名稱</label>
-        <input class="fg-input" id="pickEditorName" value="${pk.name}" placeholder="例：蛋白代餐月療程">
-      </div>
-      <div style="font-size:11px;font-weight:700;color:var(--brown);margin-bottom:8px;">商品數量（0=不加入）</div>
-      <div style="display:grid;gap:6px;">
-        ${products.map(p=>`
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#F8FAF8;border-radius:8px;">
-            <span style="font-size:12px;">${p.emoji||'📦'} ${p.cat?p.cat+'-':''}${p.name}</span>
-            <input type="number" min="0" value="${pk.items[p.id]||0}"
-              id="pick_qty_${p.id}" style="width:50px;text-align:center;border:1px solid #D0DEAD;border-radius:6px;padding:3px;font-size:12px;">
-          </div>`).join('')}
-      </div>
-      <div style="display:flex;gap:8px;margin-top:16px;">
-        <button onclick="document.getElementById('pickEditorModal').remove()" style="flex:1;padding:10px;border:1.5px solid #ddd;border-radius:10px;background:#fff;cursor:pointer;font-size:13px;">取消</button>
-        <button onclick="savePickEditor()" style="flex:2;padding:10px;border:none;border-radius:10px;background:var(--sage);color:#fff;cursor:pointer;font-size:13px;font-weight:700;">儲存方案</button>
-      </div>
-    </div>`;
+  const productRows=products.map(p=>
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#F8FAF8;border-radius:8px;">'+
+    '<span style="font-size:12px;">'+(p.emoji||'📦')+' '+(p.cat?p.cat+'-':'')+p.name+'</span>'+
+    '<input type="number" min="0" value="'+(pk.items[p.id]||0)+'" id="pick_qty_'+p.id+'" style="width:50px;text-align:center;border:1px solid #D0DEAD;border-radius:6px;padding:3px;font-size:12px;">'+
+    '</div>'
+  ).join('');
+  modal.innerHTML=
+    '<div style="background:#fff;border-radius:16px;padding:20px;max-width:500px;width:100%;max-height:80vh;overflow-y:auto;">'+
+    '<h3 style="margin:0 0 14px;">'+(editingPickIdx>=0?'編輯':'新增')+'快選方案</h3>'+
+    '<div class="form-group" style="margin-bottom:14px;">'+
+    '<label style="font-size:11px;font-weight:700;">方案名稱</label>'+
+    '<input class="fg-input" id="pickEditorName" value="'+pk.name+'" placeholder="例：蛋白代餐月療程">'+
+    '</div>'+
+    '<div style="font-size:11px;font-weight:700;color:var(--brown);margin-bottom:8px;">商品數量（0=不加入）</div>'+
+    '<div style="display:grid;gap:6px;">'+productRows+'</div>'+
+    '<div style="display:flex;gap:8px;margin-top:16px;">'+
+    '<button onclick="document.getElementById('pickEditorModal').remove()" style="flex:1;padding:10px;border:1.5px solid #ddd;border-radius:10px;background:#fff;cursor:pointer;font-size:13px;">取消</button>'+
+    '<button onclick="savePickEditor()" style="flex:2;padding:10px;border:none;border-radius:10px;background:var(--sage);color:#fff;cursor:pointer;font-size:13px;font-weight:700;">儲存方案</button>'+
+    '</div></div>';
   document.body.appendChild(modal);
 }
 
