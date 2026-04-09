@@ -1057,56 +1057,6 @@ function deletePick(idx){
 
 // ── 快選方案 ──
 const PRESET_KEY='clinicPresets';
-function getPresets(){try{const s=localStorage.getItem(PRESET_KEY);return s?JSON.parse(s):[];}catch(e){return[];}}
-function savePresets(arr){
-  localStorage.setItem(PRESET_KEY,JSON.stringify(arr));
-  if(gasUrl()){
-    gasWrite('快選方案',['名稱','商品清單'],arr.map(p=>({'名稱':p.name,'商品清單':p.items})))
-      .catch(()=>{});
-  }
-}
-function renderPresetList(){
-  const el=document.getElementById('presetList');
-  if(!el) return;
-  const presets=getPresets();
-  if(!presets.length){el.innerHTML='<div style="font-size:11px;color:#aaa;">尚無快選方案</div>';return;}
-  el.innerHTML=presets.map((p,i)=>`
-    <div style="background:#F8FBF8;border:1.5px solid #D0DEAD;border-radius:10px;padding:10px 14px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <strong style="font-size:13px;">${p.name}</strong>
-        <div style="display:flex;gap:6px;">
-          <button onclick="editPreset(${i})" style="font-size:11px;padding:2px 10px;border:1px solid #D0DEAD;border-radius:8px;background:#fff;cursor:pointer;">編輯</button>
-          <button onclick="deletePreset(${i})" style="font-size:11px;padding:2px 10px;border:1px solid #ffcdd2;border-radius:8px;background:#fff;color:#c62828;cursor:pointer;">刪除</button>
-        </div>
-      </div>
-      <div style="font-size:11px;color:#888;font-family:monospace;">${p.items}</div>
-    </div>`).join('');
-}
-function addPreset(){
-  const name=prompt('方案名稱（例：回診套組）');
-  if(!name) return;
-  const items=prompt('商品清單（每行：商品名稱=數量）
-例：黑芝麻豆奶=7
-好燃對策=1');
-  if(!items) return;
-  const presets=getPresets();
-  presets.push({name:name.trim(),items:items.trim()});
-  savePresets(presets);
-  renderPresetList();
-  toast('✅ 快選方案「'+name+'」已儲存');
-}
-function editPreset(idx){
-  const presets=getPresets();
-  const p=presets[idx];
-  const name=prompt('方案名稱',p.name);
-  if(!name) return;
-  const items=prompt('商品清單',p.items);
-  if(!items) return;
-  presets[idx]={name:name.trim(),items:items.trim()};
-  savePresets(presets);
-  renderPresetList();
-  toast('✅ 已更新');
-}
 function deletePreset(idx){
   if(!confirm('確定刪除此方案？')) return;
   const presets=getPresets();
