@@ -713,26 +713,34 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   // ── 條碼掃描監聽 ──
   let _bc='', _bcTimer=null, _bcLast=0;
   document.addEventListener('keydown', function(e){
-    const tag=(document.activeElement||{}).tagName||'';
-    const typ=(document.activeElement||{}).type||'';
-    // 只有在 number input 或無焦點時才攔截
-    if(tag==='INPUT' && typ!=='number') return;
-    if(tag==='TEXTAREA'||tag==='SELECT') return;
-
     const now=Date.now();
+    const gap=now-_bcLast;
+
     if(e.key==='Enter'){
-      if(_bc.length>=3) handleBarcodeScan(_bc);
+      if(_bc.length>=3){
+        // 掃描成功：清除所有輸入框裡可能被誤填的條碼內容
+        ['customerName','chartNumber'].forEach(function(id){
+          const el=document.getElementById(id);
+          if(el && el.value && el.value===_bc) el.value='';
+        });
+        handleBarcodeScan(_bc);
+        e.preventDefault();
+      }
       _bc=''; clearTimeout(_bcTimer); _bcLast=0;
-      e.preventDefault();
       return;
     }
-    // 間隔超過150ms且已有緩衝，視為新一輪輸入
-    if(now-_bcLast>150 && _bc.length>0) _bc='';
-    _bcLast=now;
+
+    // 掃描器特徵：字元間隔 < 50ms
+    // 手動輸入：間隔通常 > 100ms
     if(e.key.length===1){
+      if(gap>100 && _bc.length>0){
+        // 間隔太長，不是掃描器，重置
+        _bc='';
+      }
+      _bcLast=now;
       _bc+=e.key;
       clearTimeout(_bcTimer);
-      _bcTimer=setTimeout(function(){ _bc=''; }, 300);
+      _bcTimer=setTimeout(function(){ _bc=''; }, 500);
     }
   });
 });
