@@ -646,7 +646,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
         const products=pd.rows.map(r=>{
           const trimmed={};
           Object.keys(r).forEach(k=>{ trimmed[k]=typeof r[k]==='string'?r[k].trim():r[k]; });
-          return { ...trimmed, price:Number(trimmed.price)||0, active:String(trimmed.active).toUpperCase()!=='FALSE', catDescription:trimmed.catDescription||'' };
+          return { ...trimmed, price:Number(trimmed.price)||0, active:String(trimmed.active).toUpperCase()!=='FALSE', catDescription:trimmed.catDescription||'', barcode:trimmed.barcode||'' };
         });
         localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
         console.info('[products] 已同步商品，共', products.length, '項');
