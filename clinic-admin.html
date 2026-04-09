@@ -804,7 +804,7 @@ function saveProducts(p, silent=false){
   const PRODUCT_HDR=['id','cat','name','emoji','price','group','detail','badge','active','catDescription','barcode'];
   const rows=p.map(x=>({id:x.id||'',cat:x.cat||'',name:x.name||'',emoji:x.emoji||'',
     price:x.price||0,group:x.group||'',detail:x.detail||'',badge:x.badge||'',
-    active:x.active===false?'FALSE':'TRUE'}));
+    active:x.active===false?'FALSE':'TRUE',catDescription:x.catDescription||'',barcode:x.barcode||''}));
   gasWrite('商品主檔',PRODUCT_HDR,rows).then(d=>{
     if(!silent) d.status==='ok'?toast('☁️ 商品已同步至 Google Sheet'):toast('⚠️ Sheet 同步失敗：'+d.msg);
   }).catch(()=>{if(!silent)toast('⚠️ Sheet 同步網路錯誤');});
