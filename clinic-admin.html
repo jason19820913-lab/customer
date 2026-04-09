@@ -1374,10 +1374,11 @@ function renderStats(){
   log.forEach(e=>{
     const cm=getEntryComm(e);
     [['doctor',e.doctor,cm.dr],['staff',e.staff,cm.st],['nurse',e.nurse,cm.nu],['pharma',e.pharma,cm.ph]].forEach(([role,name,amt])=>{
-      if(!name||!amt) return;
+      if(!name) return;
       const key=name+'|'+role;
-      if(!commByPerson[key]) commByPerson[key]={name,role,total:0,orders:0};
+      if(!commByPerson[key]) commByPerson[key]={name,role,total:0,sales:0,orders:0};
       commByPerson[key].total+=amt;
+      commByPerson[key].sales+=(e.total||0);
       commByPerson[key].orders++;
     });
   });
@@ -1386,18 +1387,27 @@ function renderStats(){
   if(summaryEl){
     const entries=Object.values(commByPerson).sort((a,b)=>b.total-a.total);
     if(entries.length===0){
-      summaryEl.innerHTML=`<div style="color:#aaa;font-size:12px;padding:8px;">無分潤資料</div>`;
+      summaryEl.innerHTML='<div style="color:#aaa;font-size:12px;padding:8px;">無分潤資料</div>';
     } else {
       summaryEl.innerHTML=entries.map(p=>`
-        <div style="background:#fff;border-radius:12px;padding:14px 16px;border:1.5px solid #E8EEE9;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-            <div style="width:32px;height:32px;border-radius:50%;background:${roleColor[p.role]||'#6B8F71'};color:#fff;font-size:13px;font-weight:900;display:flex;align-items:center;justify-content:center;">${p.name.charAt(0)}</div>
+        <div style="background:#fff;border-radius:14px;padding:16px;border:1.5px solid #E8EEE9;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+            <div style="width:36px;height:36px;border-radius:50%;background:${roleColor[p.role]||'#6B8F71'};color:#fff;font-size:15px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${p.name.charAt(0)}</div>
             <div>
-              <div style="font-size:13px;font-weight:700;color:var(--charcoal);">${p.name}</div>
-              <div style="font-size:10px;color:#aaa;">${roleLabel[p.role]||p.role} · ${p.orders}筆</div>
+              <div style="font-size:14px;font-weight:700;color:var(--charcoal);">${p.name}</div>
+              <div style="font-size:10px;color:#aaa;margin-top:1px;">${roleLabel[p.role]||p.role} · ${p.orders}筆</div>
             </div>
           </div>
-          <div style="font-size:20px;font-weight:900;color:${roleColor[p.role]||'#6B8F71'};">NT$${p.total.toLocaleString()}</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;background:#F8FAF8;border-radius:8px;padding:7px 10px;">
+              <span style="font-size:11px;color:#888;font-weight:500;">銷售金額</span>
+              <span style="font-size:13px;font-weight:700;color:var(--charcoal);">NT$${p.sales.toLocaleString()}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;background:${roleColor[p.role]||'#6B8F71'}18;border-radius:8px;padding:7px 10px;">
+              <span style="font-size:11px;color:#888;font-weight:500;">分潤</span>
+              <span style="font-size:15px;font-weight:900;color:${roleColor[p.role]||'#6B8F71'};">NT$${p.total.toLocaleString()}</span>
+            </div>
+          </div>
         </div>`).join('');
     }
   }
