@@ -86,10 +86,25 @@ header{background:var(--charcoal);height:var(--hh);padding:0 16px;display:flex;a
 
 /* ── TABLE ── */
 .tbl-wrap{overflow-x:auto;border-radius:var(--r);box-shadow:var(--sh-sm);}
+#statsTable thead th{
+  position:sticky;
+  top:0;
+  background:#2C3E35;
+  color:#fff;
+  z-index:20;
+  white-space:nowrap;
+}
+#statsTable tfoot tr{
+  position:sticky;
+  bottom:0;
+  z-index:15;
+}
 #statsTblWrap{
   overflow-x:auto;
-  /* 固定水平捲軸在視窗底部 */
+  overflow-y:auto;
+  max-height:calc(100vh - 280px); /* 視窗高度扣掉上方篩選列 */
   position:relative;
+  border-radius:var(--r);
 }
 /* 鏡像捲軸：在表格上方加一個假捲軸固定在視窗底部 */
 #statsScrollMirror{
