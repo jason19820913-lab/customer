@@ -1491,7 +1491,7 @@ function calcOneRule(rule, salePrice, qty, lineTotal){
   if(type==='salesStage')  return (lineTotal >= thres && thres > 0) ? val : 0;
   // 銷售金額×抽成：每 NT$thres 的銷售金額給 NT$val 抽成
   // 例：每 NT$1000 給 NT$50 → 賣了 NT$3200 就給 NT$150
-  if(type==='salesAmount') return (thres > 0) ? Math.floor(lineTotal / thres) * val : 0;
+  if(type==='salesAmount') return (thres > 0) ? Math.floor(Math.round(lineTotal) / thres) * val : 0;
   return val * qty;  // fixed
 }
 
@@ -1563,7 +1563,7 @@ function calcComm(itemsStr, hasDoctor, hasStaff, hasNurse, hasPharma, actualPric
       if(type==='salesAmount'||type==='threshold'||type==='salesStage'){
         // 這類規則需要累加同 scope 的總金額
         if(!ruleAgg[key]) ruleAgg[key]={rule, totalLineTotal:0, totalQty:0};
-        ruleAgg[key].totalLineTotal += price*qty;
+        ruleAgg[key].totalLineTotal += Math.round(price*qty*10000)/10000;
         ruleAgg[key].totalQty += qty;
       } else {
         // fixed / percent：逐件計算，直接加總
