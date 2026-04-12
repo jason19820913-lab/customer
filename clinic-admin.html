@@ -86,6 +86,26 @@ header{background:var(--charcoal);height:var(--hh);padding:0 16px;display:flex;a
 
 /* ── TABLE ── */
 .tbl-wrap{overflow-x:auto;border-radius:var(--r);box-shadow:var(--sh-sm);}
+#statsTblWrap{
+  overflow-x:auto;
+  /* 固定水平捲軸在視窗底部 */
+  position:relative;
+}
+/* 鏡像捲軸：在表格上方加一個假捲軸固定在視窗底部 */
+#statsScrollMirror{
+  overflow-x:auto;
+  overflow-y:hidden;
+  position:sticky;
+  bottom:0;
+  background:#fff;
+  border-top:1px solid #E8EEE9;
+  z-index:10;
+  height:14px;
+  margin-top:-14px;
+}
+#statsScrollMirrorInner{
+  height:1px;
+}
 table{width:100%;border-collapse:collapse;background:#fff;}
 thead th{background:var(--sage-pale);padding:9px 12px;font-size:11px;font-weight:700;color:var(--charcoal);text-align:left;letter-spacing:.3px;white-space:nowrap;}
 tbody td{padding:9px 12px;font-size:11px;border-bottom:1px solid #F0F4F1;color:var(--charcoal);}
@@ -344,7 +364,8 @@ tbody tr:hover td{background:var(--sage-pale);}
       </div>
     </div>
     <div id="salesSyncStatus" style="font-size:11px;color:#888;margin-bottom:8px;display:none;"></div>
-    <div class="tbl-wrap">
+    <div id="statsScrollMirror" onclick="void(0)"><div id="statsScrollMirrorInner"></div></div>
+    <div class="tbl-wrap" id="statsTblWrap">
       <table id="statsTable" style="min-width:900px;">
         <thead id="statsHead"></thead>
         <tbody id="logBody"></tbody>
@@ -1285,6 +1306,18 @@ function renderRemarkFilter(){
     getRemarks().map(r=>`<option value="${r}"${r===cur?' selected':''}>${r}</option>`).join('');
 }
 
+function syncStatsScroll(){
+  const wrap=document.getElementById('statsTblWrap');
+  const mirror=document.getElementById('statsScrollMirror');
+  const mirrorInner=document.getElementById('statsScrollMirrorInner');
+  if(!wrap||!mirror||!mirrorInner) return;
+  // 設定鏡像寬度與表格相同
+  mirrorInner.style.width=wrap.scrollWidth+'px';
+  // 同步捲動
+  mirror.onscroll=function(){ if(wrap.scrollLeft!==mirror.scrollLeft) wrap.scrollLeft=mirror.scrollLeft; };
+  wrap.onscroll=function(){ if(mirror.scrollLeft!==wrap.scrollLeft) mirror.scrollLeft=wrap.scrollLeft; };
+}
+
 function renderStats(){
   renderClinicFilterBtns();
   renderRemarkFilter();
@@ -1472,6 +1505,7 @@ function renderStats(){
   </tr>`;
 
   tbody.innerHTML=rows.join('')+sumRow;
+  setTimeout(syncStatsScroll, 50);
 }
 
 function clearLog(){
