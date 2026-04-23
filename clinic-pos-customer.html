@@ -1674,6 +1674,7 @@ function verifyPin(){
   document.getElementById('pinModalTitle').textContent='選擇當班人員';
   document.getElementById('pinModalMsg').textContent='請填寫當班人員資訊（可部分填寫）';
   document.getElementById('staffStep').style.display='';
+  renderCheckoutSummary();
   // 重置身份折扣，並帶入上次當班人員
   selectedMemberPromoIds=new Set();
   const lastStaffMap={Doctor:'lastDoctor',Staff:'lastStaff',Nurse:'lastNurse',Pharma:'lastPharma'};
