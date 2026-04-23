@@ -1704,6 +1704,7 @@ function verifyPin(){
   } else {
     renderModalDDs();
     renderMemberDiscountBtns();
+    renderCheckoutSummary();
     renderPinRemarks();
   }
 }
@@ -1778,6 +1779,7 @@ function toggleMemberLabel(label){
   });
   updateMemberDiscountNote();
   updateDoctorFieldLock();
+  renderCheckoutSummary();
 }
 
 function updateDoctorFieldLock(){
