@@ -458,8 +458,8 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
       </div>
       <div style="height:8px;"></div><!-- 底部留白 -->
     </div>
-    <!-- 固定底部：付款方式 + 按鈕 -->
-    <div style="border-top:1px solid #E8EEE9;padding-top:12px;margin-top:4px;flex-shrink:0;">
+    <!-- 固定底部：付款方式 + 按鈕（只在 staffStep 時顯示）-->
+    <div id="checkoutFooter" style="border-top:1px solid #E8EEE9;padding-top:12px;margin-top:4px;flex-shrink:0;display:none;">
       <select class="fg-input" id="pinPayMethod" style="width:100%;margin-bottom:8px;">
         <option value="cash">💵 現金</option>
         <option value="transfer">🏦 轉帳</option>
@@ -1622,6 +1622,7 @@ function openPinModal(){
 }
 function closePinModal(){
   document.getElementById('pinModal').classList.remove('open');
+  document.getElementById('checkoutFooter').style.display='none';
 }
 
 function renderCheckoutSummary(){
@@ -1680,6 +1681,7 @@ function verifyPin(){
   document.getElementById('pinModalTitle').textContent='選擇當班人員';
   document.getElementById('pinModalMsg').textContent='請填寫當班人員資訊（可部分填寫）';
   document.getElementById('staffStep').style.display='';
+  document.getElementById('checkoutFooter').style.display='block';
   renderCheckoutSummary();
   // 重置身份折扣，並帶入上次當班人員
   selectedMemberPromoIds=new Set();
@@ -2066,7 +2068,10 @@ function closeModal(){
   if(remarkEl) remarkEl.value='';
   selectedMemberPromoIds.clear();
 
-  // 7. 重置 pinStep（讓下次結帳重新輸入密碼）
+  // 7. 隱藏底部按鈕
+  const footer=document.getElementById('checkoutFooter');
+  if(footer) footer.style.display='none';
+  // 8. 重置 pinStep（讓下次結帳重新輸入密碼）
   document.getElementById('pinStep').style.display='';
   document.getElementById('staffStep').style.display='none';
   const pinInput=document.getElementById('pinInput');
