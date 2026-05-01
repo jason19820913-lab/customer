@@ -2035,18 +2035,48 @@ async function doCheckout(){
 
 function closeModal(){
   document.getElementById('modal').classList.remove('open');
+
+  // 1. 清空購物車
   cart={};
-  ['customerName','chartNumber'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
-  // 記住院區，不清空
+
+  // 2. 清空顧客資訊
+  ['customerName','chartNumber'].forEach(id=>{
+    const e=document.getElementById(id);
+    if(e) e.value='';
+  });
+
+  // 3. 關閉姓名建議下拉
+  const sugg=document.getElementById('nameSuggestions');
+  if(sugg) sugg.style.display='none';
+
+  // 4. 記住院區，不清空
   const lastClinic=document.getElementById('clinicSelect').value;
   if(lastClinic) localStorage.setItem('lastClinic',lastClinic);
+
+  // 5. 清空員工欄位（保留記憶的人員在 lastDoctor 等 key，但 input 清空讓下次重新帶入）
   ['Doctor','Staff','Nurse','Pharma'].forEach(r=>{
-    const inp=document.getElementById('staff'+r);const val=document.getElementById('staff'+r+'Val');
-    if(inp)inp.value='';if(val)val.value='';
+    const inp=document.getElementById('staff'+r);
+    const val=document.getElementById('staff'+r+'Val');
+    if(inp) inp.value='';
+    if(val) val.value='';
   });
-  const remarkEl=document.getElementById('pinRemark');if(remarkEl)remarkEl.value='';
+
+  // 6. 清空備註、身份折扣
+  const remarkEl=document.getElementById('pinRemark');
+  if(remarkEl) remarkEl.value='';
   selectedMemberPromoIds.clear();
-  buildProductUI();renderSidebar();
+
+  // 7. 重置 pinStep（讓下次結帳重新輸入密碼）
+  document.getElementById('pinStep').style.display='';
+  document.getElementById('staffStep').style.display='none';
+  const pinInput=document.getElementById('pinInput');
+  if(pinInput) pinInput.value='';
+  const pinErr=document.getElementById('pinError');
+  if(pinErr) pinErr.textContent='';
+
+  // 8. 重建商品 UI（數量全部歸零）
+  buildProductUI();
+  renderSidebar();
 }
 
 function printReceipt(){
