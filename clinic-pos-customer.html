@@ -78,7 +78,7 @@ header{background:var(--charcoal);height:var(--hh);padding:0 16px;display:flex;a
 .fg-input{height:36px;border:1.5px solid #D8E8DA;border-radius:var(--r-sm);padding:0 10px;font-family:inherit;font-size:12px;color:var(--charcoal);background:var(--cream);outline:none;transition:border-color .2s,box-shadow .2s;-webkit-appearance:none;appearance:none;}
 .fg-input:focus{border-color:var(--sage);box-shadow:0 0 0 3px rgba(107,143,113,.15);background:#fff;}
 select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236B8F71' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;padding-right:26px;}
-.search-dd{position:fixed;background:#fff;border:1.5px solid var(--sage);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:999;height:240px;overflow-y:scroll;display:none;margin-top:4px;overscroll-behavior:contain;}
+.search-dd{position:fixed;background:#fff;border:1.5px solid var(--sage);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:999;height:240px;overflow-y:scroll;display:none;margin-top:4px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;}
 .search-dd.open{display:block;}
 .dd-item{padding:11px 14px;font-size:13px;cursor:pointer;border-bottom:1px solid #F0F4F1;transition:background .1s;}
 .dd-item:last-child{border-bottom:none;}
@@ -410,7 +410,7 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
           <label style="font-size:12px;color:var(--brown);">👨‍⚕️ 當班醫師 <span style="color:#aaa;font-weight:400;">(選填)</span></label>
           <div style="position:relative;">
             <input class="fg-input" type="text" id="staffDoctor" placeholder="搜尋醫師..." autocomplete="off"
-              oninput="filterModalDD('doctor')" onfocus="showModalDD('doctor')">
+              oninput="filterModalDD('doctor')" onfocus="showModalDD('doctor')" ontouchend="showModalDD('doctor')">
             <div class="search-dd" id="modalDoctorDd" style="min-width:180px;max-width:280px;"></div>
             <input type="hidden" id="staffDoctorVal">
           </div>
@@ -428,7 +428,7 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
         <div id="mutexStaffDiv" class="form-group">
           <div style="position:relative;">
             <input class="fg-input" type="text" id="staffStaff" placeholder="搜尋櫃檯人員..." autocomplete="off"
-              oninput="filterModalDD('staff')" onfocus="showModalDD('staff')">
+              oninput="filterModalDD('staff')" onfocus="showModalDD('staff')" ontouchend="showModalDD('staff')">
             <div class="search-dd" id="modalStaffDd" style="min-width:180px;max-width:280px;"></div>
             <input type="hidden" id="staffStaffVal">
           </div>
@@ -436,7 +436,7 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
         <div id="mutexNurseDiv" class="form-group" style="display:none;">
           <div style="position:relative;">
             <input class="fg-input" type="text" id="staffNurse" placeholder="搜尋護理師..." autocomplete="off"
-              oninput="filterModalDD('nurse')" onfocus="showModalDD('nurse')">
+              oninput="filterModalDD('nurse')" onfocus="showModalDD('nurse')" ontouchend="showModalDD('nurse')">
             <div class="search-dd" id="modalNurseDd" style="min-width:180px;max-width:280px;"></div>
             <input type="hidden" id="staffNurseVal">
           </div>
@@ -444,7 +444,7 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
         <div id="mutexPharmaDiv" class="form-group" style="display:none;">
           <div style="position:relative;">
             <input class="fg-input" type="text" id="staffPharma" placeholder="搜尋藥師..." autocomplete="off"
-              oninput="filterModalDD('pharma')" onfocus="showModalDD('pharma')">
+              oninput="filterModalDD('pharma')" onfocus="showModalDD('pharma')" ontouchend="showModalDD('pharma')">
             <div class="search-dd" id="modalPharmaDd" style="min-width:180px;max-width:280px;"></div>
             <input type="hidden" id="staffPharmaVal">
           </div>
@@ -923,7 +923,7 @@ function renderDD(type,filter=''){
   const filtered=filter?list.filter(n=>n.includes(filter)):list;
   dd.innerHTML=filtered.length===0
     ?`<div class="dd-empty">找不到「${filter}」</div>`
-    :filtered.map(n=>`<div class="dd-item${n===ddState[type]?' sel':''}" onmousedown="selPerson('${type}','${n}')">${n}</div>`).join('');
+    :filtered.map(n=>`<div class="dd-item${n===ddState[type]?' sel':''}" onclick="selPerson('${type}','${n}')">${n}</div>`).join('');
 }
 function showDD(t){
   renderDD(t,document.getElementById(t+'Input').value);
@@ -1878,7 +1878,7 @@ function filterModalDD(roleKey){
   const dd=document.getElementById('modal'+role+'Dd');
   if(!dd) return;
   const filtered=lists[roleKey]?.filter(n=>!q||n.includes(q))||[];
-  dd.innerHTML=filtered.map(n=>`<div class="dd-item" onmousedown="selectModalDD('${role}','${n}')">${n}</div>`).join('');
+  dd.innerHTML=filtered.map(n=>`<div class="dd-item" onclick="selectModalDD('${role}','${n}')">${n}</div>`).join('');
   dd.style.display=filtered.length?'block':'none';
 }
 function selectModalDD(role,name){
@@ -1887,7 +1887,7 @@ function selectModalDD(role,name){
   const dd=document.getElementById('modal'+role+'Dd');
   if(dd) dd.style.display='none';
 }
-document.addEventListener('mousedown',e=>{
+function closeModalDDs(e){
   ['Doctor','Staff','Nurse','Pharma'].forEach(r=>{
     const inp=document.getElementById('staff'+r);
     const dd=document.getElementById('modal'+r+'Dd');
@@ -1895,7 +1895,9 @@ document.addEventListener('mousedown',e=>{
     if(dd.contains(e.target)||inp?.contains(e.target)) return;
     dd.style.display='none';
   });
-});
+}
+document.addEventListener('mousedown', closeModalDDs);
+document.addEventListener('touchstart', closeModalDDs, {passive:true});
 
 async function doCheckout(){
   const products=getProducts().filter(p=>p.active!==false);
@@ -2040,6 +2042,9 @@ function closeModal(){
 
   // 1. 清空購物車
   cart={};
+  // 立即強制清零所有數量輸入欄（避免 buildProductUI 前的視覺殘留）
+  document.querySelectorAll('.qty-input').forEach(function(el){ el.value='0'; });
+  document.querySelectorAll('.product-card.selected').forEach(function(el){ el.classList.remove('selected'); });
 
   // 2. 清空顧客資訊
   ['customerName','chartNumber'].forEach(id=>{
