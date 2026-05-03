@@ -1337,51 +1337,60 @@ function renderStats(){
   renderClinicFilterBtns();
   renderRemarkFilter();
   const allLog=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
-  // 日期過濾
-  // 台灣時區 (UTC+8) 的今日日期
-  function twToday(){
+  // 日期過濾：統一用 "YYYY-MM-DD" 字串比較，避免時區問題
+  function toDateStr(date){
+    // 轉成 YYYY-MM-DD 字串
+    const y=date.getFullYear();
+    const m=String(date.getMonth()+1).padStart(2,'0');
+    const d=String(date.getDate()).padStart(2,'0');
+    return y+'-'+m+'-'+d;
+  }
+  function twTodayStr(){
     const now=new Date();
     const tw=new Date(now.getTime()+8*60*60*1000);
-    return new Date(tw.getUTCFullYear(), tw.getUTCMonth(), tw.getUTCDate());
+    return tw.getUTCFullYear()+'-'+String(tw.getUTCMonth()+1).padStart(2,'0')+'-'+String(tw.getUTCDate()).padStart(2,'0');
   }
-  const today=twToday();
+  const todayStr=twTodayStr();
 
-  function parseEntryDate(e){
+  function parseEntryDateStr(e){
     const raw=(e.date||'').trim();
     if(!raw) return null;
-    // ISO timestamp（含T，從 Sheet 載入）：直接取 UTC 日期
+    // ISO timestamp（含T，從 Sheet 載入）：+8h 取台灣日期
     if(raw.includes('T')){
       const d=new Date(raw);
       if(!isNaN(d)){
-        // GAS 日期用台灣時間午夜，需 +8h 轉回台灣日期
         const tw=new Date(d.getTime()+8*60*60*1000);
-        return new Date(tw.getUTCFullYear(), tw.getUTCMonth(), tw.getUTCDate());
+        return tw.getUTCFullYear()+'-'+String(tw.getUTCMonth()+1).padStart(2,'0')+'-'+String(tw.getUTCDate()).padStart(2,'0');
       }
       return null;
     }
     // 本機格式 2026/3/14 或 2026-03-14 或 2026年3月14日
     const m=raw.match(/(\d{4})[^\d]+(\d{1,2})[^\d]+(\d{1,2})/);
-    if(m) return new Date(parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3]));
+    if(m) return m[1]+'-'+String(parseInt(m[2])).padStart(2,'0')+'-'+String(parseInt(m[3])).padStart(2,'0');
     return null;
   }
   function inDateRange(e){
-    const d=parseEntryDate(e);
-    if(!d) return true;
-    const dTime=d.getTime();
-    if(activeDateMode==='today') return dTime===today.getTime();
-    if(activeDateMode==='yesterday'){const y=new Date(today);y.setDate(y.getDate()-1);return dTime===y.getTime();}
-    if(activeDateMode==='week'){
-      const w=new Date(today);
-      // 週一為一週起始
-      const day=w.getDay()||7;
-      w.setDate(w.getDate()-day+1);
-      return d>=w&&d<=today;
+    const ds=parseEntryDateStr(e);
+    if(!ds) return true;
+    if(activeDateMode==='today') return ds===todayStr;
+    if(activeDateMode==='yesterday'){
+      const y=new Date(new Date().getTime()+8*60*60*1000);
+      y.setUTCDate(y.getUTCDate()-1);
+      const ys=y.getUTCFullYear()+'-'+String(y.getUTCMonth()+1).padStart(2,'0')+'-'+String(y.getUTCDate()).padStart(2,'0');
+      return ds===ys;
     }
-    if(activeDateMode==='month') return d.getFullYear()===today.getFullYear()&&d.getMonth()===today.getMonth();
+    if(activeDateMode==='week'){
+      const now=new Date(new Date().getTime()+8*60*60*1000);
+      const dow=now.getUTCDay()||7; // 1=Mon
+      const mon=new Date(now.getTime()-(dow-1)*86400000);
+      const monStr=mon.getUTCFullYear()+'-'+String(mon.getUTCMonth()+1).padStart(2,'0')+'-'+String(mon.getUTCDate()).padStart(2,'0');
+      return ds>=monStr&&ds<=todayStr;
+    }
+    if(activeDateMode==='month') return ds.slice(0,7)===todayStr.slice(0,7);
     if(activeDateMode==='all') return true;
     if(activeDateMode==='custom'){
-      if(activeDateFrom&&d<new Date(activeDateFrom)) return false;
-      if(activeDateTo){const to=new Date(activeDateTo);to.setDate(to.getDate()+1);if(d>=to)return false;}
+      if(activeDateFrom&&ds<activeDateFrom) return false;
+      if(activeDateTo&&ds>activeDateTo) return false;
       return true;
     }
     return true;
