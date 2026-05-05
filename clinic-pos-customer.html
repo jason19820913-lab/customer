@@ -1904,10 +1904,15 @@ async function doCheckout(){
   const items=buildItems();
   const total=items.reduce((s,i)=>s+i.price,0);
   const clinic=document.getElementById('clinicSelect').value;
-  const doctor=document.getElementById('staffDoctorVal').value;
-  const staffV=document.getElementById('staffStaffVal').value;
-  const nurseV=document.getElementById('staffNurseVal').value;
-  const pharmaV=document.getElementById('staffPharmaVal').value;
+  // 以 input 顯示值為準（空白就當空），不用 hidden Val
+  const doctorInp=document.getElementById('staffDoctor');
+  const staffInp=document.getElementById('staffStaff');
+  const nurseInp=document.getElementById('staffNurse');
+  const pharmaInp=document.getElementById('staffPharma');
+  const doctor=(doctorInp&&doctorInp.value.trim())?document.getElementById('staffDoctorVal').value:'';
+  const staffV=(staffInp&&staffInp.value.trim())?document.getElementById('staffStaffVal').value:'';
+  const nurseV=(nurseInp&&nurseInp.value.trim())?document.getElementById('staffNurseVal').value:'';
+  const pharmaV=(pharmaInp&&pharmaInp.value.trim())?document.getElementById('staffPharmaVal').value:'';
   const customer=document.getElementById('customerName').value.trim();
   const chartNum=document.getElementById('chartNumber').value.trim();
   payMethod=document.getElementById('pinPayMethod').value;
@@ -2087,6 +2092,11 @@ function closeModal(){
   // 8. 重建商品 UI（數量全部歸零）
   buildProductUI();
   renderSidebar();
+  // 確保 qty-input 清零（防止 buildProductUI 前的快取）
+  setTimeout(function(){
+    document.querySelectorAll('.qty-input').forEach(function(el){ if(el.value!=='0') el.value='0'; });
+    document.querySelectorAll('.product-card.selected').forEach(function(el){ el.classList.remove('selected'); });
+  }, 50);
 }
 
 function printReceipt(){
