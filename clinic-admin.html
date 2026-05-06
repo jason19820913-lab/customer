@@ -363,6 +363,11 @@ tbody tr:hover td{background:var(--sage-pale);}
       <div class="stat-card"><div class="stat-icon">💊</div><div class="stat-num" id="statPh">NT$ 0</div><div class="stat-label">藥師抽成</div></div>
     </div>
     <div class="section-title" style="margin-top:20px;">
+      <span>商品銷售統計</span>
+    </div>
+    <div id="productSummaryGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:20px;"></div>
+
+    <div class="section-title" style="margin-top:8px;">
       <span>人員分潤摘要</span>
     </div>
     <div id="commSummaryGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:20px;"></div>
@@ -1424,6 +1429,62 @@ function renderStats(){
     if(e.itemQty){Object.keys(e.itemQty).forEach(k=>{if(e.itemQty[k]>0&&!statKeys.includes(k))statKeys.push(k);});}
     else if(e.items){e.items.split('、').forEach(part=>{const m=part.match(/^(.+?)×/);if(m&&!statKeys.includes(m[1].trim()))statKeys.push(m[1].trim());});}
   });
+
+  // ── 商品銷售統計字卡 ──
+  // 取得商品主檔：用於識別 group（判斷是否有口味分類）
+  const allProducts=getAdminProducts();
+  // 建立 cat→group 對應
+  const catGroupMap={};
+  allProducts.forEach(p=>{ if(p.cat&&p.group) catGroupMap[p.cat]=p.group; });
+
+  // 彙總：key = "分類-口味" 或 "分類"
+  const prodTotals={}; // cat → { total, flavors:{name:qty} }
+  statKeys.forEach(k=>{
+    const qty=log.reduce((s,e)=>s+getQty(e,k),0);
+    if(!qty) return;
+    // k 格式：「蛋白代餐-草莓脆果」或「盒裝膠囊-好燃對策」或「好燃對策」
+    const dash=k.indexOf('-');
+    let cat,flavor;
+    if(dash>0){
+      cat=k.slice(0,dash);
+      flavor=k.slice(dash+1);
+    } else {
+      cat=k; flavor=null;
+    }
+    if(!prodTotals[cat]) prodTotals[cat]={total:0,flavors:{}};
+    prodTotals[cat].total+=qty;
+    if(flavor) prodTotals[cat].flavors[flavor]=(prodTotals[cat].flavors[flavor]||0)+qty;
+  });
+
+  // 顏色清單
+  const cardColors=['#4A9B8E','#6B8F71','#8E6B9B','#9B7B4A','#4A7B9B','#9B4A6B','#7B9B4A','#4A4A9B'];
+  const prodSummaryEl=document.getElementById('productSummaryGrid');
+  if(prodSummaryEl){
+    const entries=Object.entries(prodTotals).sort((a,b)=>b[1].total-a[1].total);
+    if(!entries.length){
+      prodSummaryEl.innerHTML='<div style="color:#aaa;font-size:12px;padding:8px;">無商品資料</div>';
+    } else {
+      prodSummaryEl.innerHTML=entries.map(([cat,data],ci)=>{
+        const color=cardColors[ci%cardColors.length];
+        const flavorEntries=Object.entries(data.flavors).sort((a,b)=>b[1]-a[1]);
+        const hasFlavors=flavorEntries.length>0;
+        const flavorHtml=hasFlavors
+          ?'<div style="margin-top:8px;border-top:1px solid rgba(0,0,0,.08);padding-top:8px;display:flex;flex-wrap:wrap;gap:4px;">'+
+            flavorEntries.map(([fl,qty])=>
+              '<span style="font-size:10px;background:rgba(0,0,0,.06);border-radius:6px;padding:2px 7px;white-space:nowrap;">'+fl+' <strong>'+qty+'</strong></span>'
+            ).join('')+'</div>'
+          :'';
+        return '<div style="background:#fff;border-radius:14px;padding:16px;border:1.5px solid #E8EEE9;box-shadow:0 2px 8px rgba(0,0,0,.06);">'+
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'+
+          '<div style="width:10px;height:10px;border-radius:50%;background:'+color+';flex-shrink:0;"></div>'+
+          '<div style="font-size:12px;font-weight:700;color:var(--charcoal);">'+cat+'</div>'+
+          '</div>'+
+          '<div style="font-size:28px;font-weight:900;color:'+color+';">'+data.total.toLocaleString()+'<span style="font-size:13px;font-weight:500;color:#888;margin-left:4px;">件</span></div>'+
+          flavorHtml+
+          '</div>';
+      }).join('');
+    }
+  }
 
   // 人員分潤摘要卡片
   const commByPerson={};
