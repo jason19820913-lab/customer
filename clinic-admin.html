@@ -94,6 +94,30 @@ header{background:var(--charcoal);height:var(--hh);padding:0 16px;display:flex;a
   z-index:20;
   white-space:nowrap;
 }
+/* 前11欄固定不動（日期到藥師） */
+#statsTable th.col-fixed,
+#statsTable td.col-fixed{
+  position:sticky;
+  background:#fff;
+  z-index:10;
+  border-right:none;
+}
+#statsTable thead th.col-fixed{
+  background:#2C3E35;
+  z-index:25;
+}
+/* 最後一個固定欄加右邊陰影 */
+#statsTable th.col-fixed-last,
+#statsTable td.col-fixed-last{
+  position:sticky;
+  background:#fff;
+  z-index:10;
+  box-shadow:3px 0 6px rgba(0,0,0,.10);
+}
+#statsTable thead th.col-fixed-last{
+  background:#2C3E35;
+  z-index:25;
+}
 #statsTable tfoot tr{
   position:sticky;
   bottom:0;
@@ -1531,7 +1555,7 @@ function renderStats(){
   }
 
   document.getElementById('statsHead').innerHTML=`<tr>
-    <th>日期</th><th>時間</th><th style="white-space:nowrap;">院區</th><th>顧客</th><th style="white-space:nowrap;">病歷號</th><th>身份</th><th>備註</th><th>醫師</th><th>櫃檯</th><th>護理師</th><th>藥師</th>
+<th class="col-fixed" style="left:0px;min-width:70px;">日期</th><th class="col-fixed" style="left:70px;min-width:60px;">時間</th><th class="col-fixed" style="left:130px;min-width:70px;white-space:nowrap;">院區</th><th class="col-fixed" style="left:200px;min-width:80px;">顧客</th><th class="col-fixed" style="left:280px;min-width:70px;white-space:nowrap;">病歷號</th><th class="col-fixed" style="left:350px;min-width:70px;">身份</th><th class="col-fixed" style="left:420px;min-width:70px;">備註</th><th class="col-fixed" style="left:490px;min-width:70px;">醫師</th><th class="col-fixed" style="left:560px;min-width:70px;">櫃檯</th><th class="col-fixed" style="left:630px;min-width:70px;">護理師</th><th class="col-fixed-last" style="left:700px;min-width:70px;">藥師</th>
     ${statKeys.map(k=>`<th style="font-size:10px;white-space:nowrap;">${k}</th>`).join('')}
     <th>金額</th><th>付款</th>
     <th style="color:#7B6200;white-space:nowrap;">醫師抽成</th>
@@ -1548,17 +1572,17 @@ function renderStats(){
   const rows=[...log].reverse().map(e=>{
     const cm=getEntryComm(e);
     return`<tr>
-      <td style="white-space:nowrap;">${fmtDate(e.date)||''}</td>
-      <td style="white-space:nowrap;">${fmtTime(e.time)||''}</td>
-      <td><span style="font-size:10px;background:var(--sage-pale);color:var(--sage);padding:2px 7px;border-radius:9px;font-weight:600;white-space:nowrap;">${e.clinic||'-'}</span></td>
-      <td><strong>${e.customer||''}</strong></td>
-      <td style="white-space:nowrap;color:#888;font-size:11px;">${e.phone||'—'}</td>
-      <td style="white-space:nowrap;">${e.identity?`<span style="font-size:10px;background:#FFF3E0;color:#E65100;padding:2px 8px;border-radius:9px;font-weight:600;">${e.identity}</span>`:`<span style="color:#ddd;">—</span>`}</td>
-      <td style="white-space:nowrap;color:#666;font-size:11px;">${e.remark||'—'}</td>
-      <td style="white-space:nowrap;">${e.doctor||'-'}</td>
-      <td style="white-space:nowrap;">${e.staff||'-'}</td>
-      <td style="white-space:nowrap;">${e.nurse||'-'}</td>
-      <td style="white-space:nowrap;">${e.pharma||'-'}</td>
+      <td class="col-fixed" style="left:0px;white-space:nowrap;">${fmtDate(e.date)||""}</td>
+      <td class="col-fixed" style="left:70px;white-space:nowrap;">${fmtTime(e.time)||""}</td>
+      <td class="col-fixed" style="left:130px;"><span style="font-size:10px;background:var(--sage-pale);color:var(--sage);padding:2px 7px;border-radius:9px;font-weight:600;white-space:nowrap;">${e.clinic||"-"}</span></td>
+      <td class="col-fixed" style="left:200px;"><strong>${e.customer||""}</strong></td>
+      <td class="col-fixed" style="left:280px;white-space:nowrap;color:#888;font-size:11px;">${e.phone||"—"}</td>
+      <td class="col-fixed" style="left:350px;white-space:nowrap;">${e.identity?`<span style="font-size:10px;background:#FFF3E0;color:#E65100;padding:2px 8px;border-radius:9px;font-weight:600;">${e.identity}</span>`:`<span style="color:#ddd;">—</span>`}</td>
+      <td class="col-fixed" style="left:420px;white-space:nowrap;color:#666;font-size:11px;">${e.remark||"—"}</td>
+      <td class="col-fixed" style="left:490px;white-space:nowrap;">${e.doctor||"-"}</td>
+      <td class="col-fixed" style="left:560px;white-space:nowrap;">${e.staff||"-"}</td>
+      <td class="col-fixed" style="left:630px;white-space:nowrap;">${e.nurse||"-"}</td>
+      <td class="col-fixed-last" style="left:700px;white-space:nowrap;">${e.pharma||"-"}</td>
       ${statKeys.map(k=>qCell(getQty(e,k))).join('')}
       <td style="white-space:nowrap;"><strong style="color:var(--sage);">NT$${(e.total||0).toLocaleString()}</strong></td>
       <td><span class="tag ${e.payMethod==='cash'?'tag-cash':'tag-transfer'}">${e.payMethod==='cash'?'現金':'轉帳'}</span></td>
@@ -1576,7 +1600,7 @@ function renderStats(){
   const totalPh=log.reduce((s,e)=>s+getEntryComm(e).ph,0);
   const fixedCols=11; // 日期~藥師共11欄
   const sumRow=`<tr style="background:#F0F5F1;font-weight:700;border-top:2px solid var(--sage);">
-    <td colspan="${fixedCols}" style="text-align:right;padding:8px 12px;font-size:12px;color:var(--brown);">合計（${log.length} 筆）</td>
+    <td class="col-fixed" colspan="${fixedCols}" style="left:0;text-align:right;padding:8px 12px;font-size:12px;color:var(--brown);background:#F0F5F1;">合計（${log.length} 筆）</td>
     ${statKeys.map(k=>{
       const tot=totalQtyMap[k];
       return tot>0?`<td style="text-align:center;color:var(--sage);font-size:13px;">${tot}</td>`:`<td style="text-align:center;color:#ddd;">—</td>`;
