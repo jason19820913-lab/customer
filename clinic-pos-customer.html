@@ -1685,14 +1685,29 @@ function verifyPin(){
   renderCheckoutSummary();
   // 重置身份折扣，並帶入上次當班人員
   selectedMemberPromoIds=new Set();
-  const lastStaffMap={Doctor:'lastDoctor',Staff:'lastStaff',Nurse:'lastNurse',Pharma:'lastPharma'};
-  ['Doctor','Staff','Nurse','Pharma'].forEach(r=>{
-    const inp=document.getElementById('staff'+r);
-    const val=document.getElementById('staff'+r+'Val');
-    const last=localStorage.getItem(lastStaffMap[r])||'';
-    if(inp) inp.value=last;
-    if(val) val.value=last;
+
+  // 醫師直接帶入
+  const lastDoctor=localStorage.getItem('lastDoctor')||'';
+  const drInp=document.getElementById('staffDoctor');
+  const drVal=document.getElementById('staffDoctorVal');
+  if(drInp) drInp.value=lastDoctor;
+  if(drVal) drVal.value=lastDoctor;
+
+  // 櫃檯/護理師/藥師：三擇一互斥，找上次用哪個角色
+  const lastMutexRole=localStorage.getItem('lastMutexRole')||'staff';
+  const lastMutexName=localStorage.getItem('last'+lastMutexRole.charAt(0).toUpperCase()+lastMutexRole.slice(1))||'';
+  // 先清空三個
+  ['Staff','Nurse','Pharma'].forEach(R=>{
+    const inp=document.getElementById('staff'+R);const val=document.getElementById('staff'+R+'Val');
+    if(inp)inp.value='';if(val)val.value='';
   });
+  // 再帶入上次角色
+  const mInp=document.getElementById('staff'+lastMutexRole.charAt(0).toUpperCase()+lastMutexRole.slice(1));
+  const mVal=document.getElementById('staff'+lastMutexRole.charAt(0).toUpperCase()+lastMutexRole.slice(1)+'Val');
+  if(mInp) mInp.value=lastMutexName;
+  if(mVal) mVal.value=lastMutexName;
+  // 同步互斥按鈕狀態
+  selectMutexRole(lastMutexRole);
   // 若 localStorage 沒有人員資料，先從 Sheet 同步再顯示
   const staffData=getStaff();
   const hasStaff=(staffData.doctors||[]).length+(staffData.staff||[]).length+(staffData.nurses||[]).length+(staffData.pharmas||[]).length;
@@ -1980,9 +1995,9 @@ async function doCheckout(){
   )].join('、');
   // 記住當班人員（下一位顧客自動帶入）
   if(doctor) localStorage.setItem('lastDoctor',doctor);
-  if(staffV) localStorage.setItem('lastStaff',staffV);
-  if(nurseV) localStorage.setItem('lastNurse',nurseV);
-  if(pharmaV) localStorage.setItem('lastPharma',pharmaV);
+  if(staffV){ localStorage.setItem('lastStaff',staffV); localStorage.setItem('lastMutexRole','staff'); }
+  if(nurseV){ localStorage.setItem('lastNurse',nurseV); localStorage.setItem('lastMutexRole','nurse'); }
+  if(pharmaV){ localStorage.setItem('lastPharma',pharmaV); localStorage.setItem('lastMutexRole','pharma'); }
   const entry={date,time,clinic,customer,phone:chartNum,doctor,staff:staffV,nurse:nurseV,pharma:pharmaV,
     items:itemsStr,itemQty,total,payMethod,remark,identity:activePromoLabels,
     doctorComm:cm.dr,staffComm:cm.st,nurseComm:cm.nu,pharmaComm:cm.ph,idHash:'',idMask:''};
