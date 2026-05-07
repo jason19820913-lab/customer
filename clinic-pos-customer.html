@@ -486,9 +486,10 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
       <div class="modal-receipt" id="modalReceipt"></div>
       <div style="border-top:2px dashed #ccc;padding-top:8px;margin-top:8px;text-align:center;font-size:10px;color:#aaa;">感謝您的購買，祝您身體健康 🌿</div>
     </div>
-    <div style="display:flex;gap:8px;margin-top:14px;">
-      <button class="modal-close" style="flex:1;background:none;border:1.5px solid #ddd;color:#888;" onclick="printReceipt()">🖨️ 列印收據</button>
-      <button class="modal-close" style="flex:2;background:var(--sage);color:#fff;border:none;" onclick="closeModal()">新增下一位顧客</button>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+      <button class="modal-close" style="flex:1;min-width:80px;background:none;border:1.5px solid var(--sage);color:var(--sage);" onclick="printReceipt()">🖨️ 列印</button>
+      <button class="modal-close" style="flex:1;min-width:80px;background:none;border:1.5px solid #888;color:#888;" onclick="saveReceiptImage()">💾 存檔</button>
+      <button class="modal-close" style="flex:2;min-width:100px;background:var(--sage);color:#fff;border:none;" onclick="closeModal()">✅ 完成</button>
     </div>
   </div>
 </div>
@@ -1915,6 +1916,11 @@ document.addEventListener('mousedown', closeModalDDs);
 document.addEventListener('touchstart', closeModalDDs, {passive:true});
 
 async function doCheckout(){
+  // 立即關閉 pinModal（不管後面有沒有錯誤）
+  document.getElementById('pinModal').classList.remove('open');
+  const footerEl=document.getElementById('checkoutFooter');
+  if(footerEl) footerEl.style.display='none';
+
   const products=getProducts().filter(p=>p.active!==false);
   const items=buildItems();
   const total=items.reduce((s,i)=>s+i.price,0);
@@ -2005,9 +2011,6 @@ async function doCheckout(){
   const log=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
   log.push(entry);
   localStorage.setItem(SALES_KEY,JSON.stringify(log));
-
-  // 關閉密碼 modal，開結帳完成 modal
-  document.getElementById('pinModal').classList.remove('open');
 
   // 建收據（58mm 熱感應紙優化）
   const itemRows=items.map(it=>{
@@ -2117,6 +2120,39 @@ function closeModal(){
     document.querySelectorAll('.qty-input').forEach(function(el){ if(el.value!=='0') el.value='0'; });
     document.querySelectorAll('.product-card.selected').forEach(function(el){ el.classList.remove('selected'); });
   }, 50);
+}
+
+function saveReceiptImage(){
+  const area=document.getElementById('receiptArea');
+  if(!area){toast('⚠️ 找不到收據內容');return;}
+  // 用 canvas 截圖存成 PNG
+  const script=document.createElement('script');
+  script.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+  script.onload=function(){
+    html2canvas(area,{
+      backgroundColor:'#fff',
+      scale:3, // 高解析度
+      useCORS:true,
+      logging:false
+    }).then(function(canvas){
+      const link=document.createElement('a');
+      const now=new Date();
+      const fname='收據_'+now.toLocaleDateString('zh-TW').replace(/\//g,'')+'.png';
+      link.download=fname;
+      link.href=canvas.toDataURL('image/png');
+      link.click();
+      toast('✅ 收據已儲存為圖片');
+    }).catch(function(){
+      toast('⚠️ 儲存失敗，請使用列印功能');
+    });
+  };
+  script.onerror=function(){ toast('⚠️ 載入失敗，請使用列印功能'); };
+  // 若已載入就直接用
+  if(window.html2canvas){
+    script.onload();
+  } else {
+    document.head.appendChild(script);
+  }
 }
 
 function printReceipt(){
