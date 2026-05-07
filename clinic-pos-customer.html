@@ -2030,6 +2030,11 @@ async function doCheckout(){
   closeDrawer();
   toast('✅ 結帳完成！NT$'+total.toLocaleString());
 
+  // 立即清空購物車（不等按「新增下一位顧客」）
+  cart={};
+  document.querySelectorAll('.qty-input').forEach(function(el){ el.value='0'; });
+  document.querySelectorAll('.product-card.selected').forEach(function(el){ el.classList.remove('selected'); });
+
   if(gasUrl()){
     try{
       const FIXED_FRONT=['日期','時間','院區','顧客姓名','身分證遮罩','病歷號','顧客身份','備註','當班醫師','櫃檯人員','護理師','藥師'];
