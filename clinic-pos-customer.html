@@ -2012,27 +2012,52 @@ async function doCheckout(){
   log.push(entry);
   localStorage.setItem(SALES_KEY,JSON.stringify(log));
 
-  // 建收據（58mm 熱感應紙優化）
-  const itemRows=items.map(it=>{
+  // 建收據（全螢幕 overlay，不用新視窗避免被瀏覽器封鎖）
+  const itemRowsHtml=items.map(function(it){
     const isDiscount=it.price<0;
-    return `<div class="receipt-row${isDiscount?' receipt-discount':''}">
-      <span class="receipt-item-name">${it.name}</span>
-      <span>${isDiscount?'-':''}NT$${Math.abs(it.price).toLocaleString()}</span>
-    </div>${it.sub?`<div class="receipt-item-sub">${it.sub}</div>`:''}`;
+    const color=isDiscount?'#c62828':'#1a1a1a';
+    return '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px dashed #e0e0e0;">'+
+      '<div style="flex:1;"><div style="font-size:13px;font-weight:600;color:'+color+';">'+it.name+'</div>'+
+      (it.sub?'<div style="font-size:10px;color:#888;margin-top:2px;">'+it.sub+'</div>':'')+
+      '</div><div style="font-size:13px;font-weight:700;color:'+color+';white-space:nowrap;margin-left:12px;">'+(isDiscount?'-':'')+'NT$'+Math.abs(it.price).toLocaleString()+'</div></div>';
   }).join('');
-  document.getElementById('modalMsg').textContent=`感謝 ${customer} 的購買！`;
-  document.getElementById('modalReceipt').innerHTML=`
-    <div style="font-size:10px;color:#888;margin-bottom:8px;">${clinic} ｜ ${date} ${time}</div>
-    ${itemRows}
-    <div style="border-top:1px dashed #ccc;margin:8px 0;"></div>
-    ${remark?`<div class="receipt-row"><span>備註</span><span>${remark}</span></div>`:''}
-    <div class="receipt-row"><span>付款方式</span><span>${payMethod==='cash'?'現金':'轉帳'}</span></div>
-    <div class="receipt-row" style="font-weight:900;font-size:14px;border-top:1px solid #ccc;margin-top:6px;padding-top:6px;"><span>結帳總額</span><span style="color:#000;">NT$${total.toLocaleString()}</span></div>
-    <div id="syncStatus" style="margin-top:8px;text-align:center;font-size:10px;color:#aaa;">📡 同步中...</div>`;
-  document.getElementById('modal').classList.add('open');
+
+  // 建立收據 overlay
+  const existOverlay=document.getElementById('receiptOverlay');
+  if(existOverlay) existOverlay.remove();
+  const overlay=document.createElement('div');
+  overlay.id='receiptOverlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px);';
+  overlay.innerHTML=
+    '<div id="receiptCard" style="background:#fff;border-radius:18px;padding:24px;max-width:400px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.25);">'+
+    '<div style="text-align:center;font-size:20px;font-weight:900;color:#1E2E26;letter-spacing:1px;">擇木良食藥局</div>'+
+    '<div style="text-align:center;font-size:11px;color:#888;margin-top:4px;margin-bottom:14px;">健康銷售收據</div>'+
+    '<hr style="border:none;border-top:2px dashed #ccc;margin:12px 0;">'+
+    '<div style="font-size:12px;color:#555;line-height:2;margin-bottom:10px;">'+
+      '🏥 院區：'+clinic+'<br>'+
+      '📅 日期：'+date+' '+time+'<br>'+
+      '👤 顧客：'+customer+(chartNum?' ｜ 病歷號：'+chartNum:'')+
+      (remark?'<br>📝 備註：'+remark:'')+
+    '</div>'+
+    '<hr style="border:none;border-top:2px dashed #ccc;margin:12px 0;">'+
+    '<div>'+itemRowsHtml+'</div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-top:2px solid #1E2E26;margin-top:8px;">'+
+      '<div style="font-size:15px;font-weight:700;">結帳總額</div>'+
+      '<div style="font-size:22px;font-weight:900;color:#1E2E26;">NT$'+total.toLocaleString()+'</div>'+
+    '</div>'+
+    '<div style="font-size:11px;color:#888;margin-bottom:12px;">付款方式：'+(payMethod==='cash'?'💵 現金':'🏦 轉帳')+'</div>'+
+    '<hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">'+
+    '<div style="text-align:center;font-size:10px;color:#aaa;margin-bottom:16px;">感謝您的購買 🌿</div>'+
+    '<div style="display:flex;gap:8px;">'+
+      '<button onclick="window.print()" style="flex:1;padding:12px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;background:#1E2E26;color:#fff;border:none;font-family:inherit;">🖨️ 列印</button>'+
+      '<button onclick="saveReceiptImg()" style="flex:1;padding:12px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;background:#fff;color:#1E2E26;border:2px solid #1E2E26;font-family:inherit;">💾 存檔</button>'+
+      '<button onclick="closeReceiptOverlay()" style="flex:1;padding:12px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;background:#eee;color:#555;border:none;font-family:inherit;">✅ 完成</button>'+
+    '</div>'+
+    '</div>';
+  document.body.appendChild(overlay);
+
   closeDrawer();
   toast('✅ 結帳完成！NT$'+total.toLocaleString());
-
   // 立即清空購物車（不等按「新增下一位顧客」）
   cart={};
   document.querySelectorAll('.qty-input').forEach(function(el){ el.value='0'; });
@@ -2064,6 +2089,51 @@ async function doCheckout(){
   }
 }
 
+
+function closeReceiptOverlay(){
+  const overlay=document.getElementById('receiptOverlay');
+  if(overlay) overlay.remove();
+  // 清空顧客資訊和購物車
+  ['customerName','chartNumber'].forEach(function(id){
+    const el=document.getElementById(id);if(el)el.value='';
+  });
+  const sugg=document.getElementById('nameSuggestions');
+  if(sugg) sugg.style.display='none';
+  // 記住院區
+  const lastClinic=document.getElementById('clinicSelect').value;
+  if(lastClinic) localStorage.setItem('lastClinic',lastClinic);
+  // 重置 pin modal
+  document.getElementById('pinStep').style.display='';
+  document.getElementById('staffStep').style.display='none';
+  const footerEl=document.getElementById('checkoutFooter');
+  if(footerEl) footerEl.style.display='none';
+  const pinInput=document.getElementById('pinInput');
+  if(pinInput) pinInput.value='';
+  renderSidebar();
+}
+
+function saveReceiptImg(){
+  const card=document.getElementById('receiptCard');
+  if(!card){toast('⚠️ 找不到收據');return;}
+  // 隱藏按鈕後截圖
+  const btns=card.querySelector('div:last-child');
+  if(btns) btns.style.display='none';
+  const s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+  s.onload=function(){
+    html2canvas(card,{scale:3,backgroundColor:'#fff',useCORS:true}).then(function(cv){
+      if(btns) btns.style.display='';
+      const a=document.createElement('a');
+      const now=new Date();
+      a.download='收據_'+now.toLocaleDateString('zh-TW').replace(/\//g,'')+'.png';
+      a.href=cv.toDataURL('image/png');
+      a.click();
+      toast('✅ 收據已儲存');
+    }).catch(function(){ if(btns) btns.style.display=''; toast('⚠️ 儲存失敗'); });
+  };
+  if(window.html2canvas){ s.onload(); }
+  else { document.head.appendChild(s); }
+}
 
 function closeModal(){
   document.getElementById('modal').classList.remove('open');
