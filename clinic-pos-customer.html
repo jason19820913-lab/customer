@@ -735,9 +735,13 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     const now=Date.now();
     const gap=now-_bcLast;
 
+    // 收據視窗開啟時不處理條碼
+    if(document.getElementById('receiptOverlay')) return;
+    // pinModal 開啟時不處理條碼
+    if(document.getElementById('pinModal')?.classList.contains('open')) return;
+
     if(e.key && e.key==='Enter'){
       if(_bc.length>=3){
-        // 掃描成功：清除所有輸入框裡可能被誤填的條碼內容
         ['customerName','chartNumber'].forEach(function(id){
           const el=document.getElementById(id);
           if(el && el.value && el.value===_bc) el.value='';
@@ -749,16 +753,16 @@ document.addEventListener('DOMContentLoaded', async ()=>{
       return;
     }
 
-    // 掃描器特徵：字元間隔 < 50ms
-    // 手動輸入：間隔通常 > 100ms
     if(e.key && typeof e.key==='string' && e.key.length===1){
-      if(gap>100 && _bc.length>0){
-        // 間隔太長，不是掃描器，重置
-        _bc='';
+      // 放寬間隔到 300ms（相容較慢的掃描器）
+      // 但若 buffer 是空的（第一個字元），不管間隔多長都接受
+      if(_bc.length>0 && gap>300){
+        _bc=''; // 間隔太長，重置
       }
       _bcLast=now;
       _bc+=e.key;
       clearTimeout(_bcTimer);
+      // 500ms 內沒有按 Enter 就清空（防止殘留）
       _bcTimer=setTimeout(function(){ _bc=''; }, 500);
     }
   });
