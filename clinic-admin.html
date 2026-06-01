@@ -1463,6 +1463,13 @@ function renderStats(){
     if(activeCF&&(e.clinic||'')!==activeCF) return false;
     if(activeRemark==='__none__') return !e.remark;
     if(activeRemark&&(e.remark||'')!==activeRemark) return false;
+    // 商品數量篩選
+    if(productQtyFilterCat && productQtyFilterNum>0){
+      const qty=Object.entries(e.itemQty||{})
+        .filter(function([k]){ return k===productQtyFilterCat||k.startsWith(productQtyFilterCat+'-'); })
+        .reduce(function(s,[,v]){ return s+v; }, 0);
+      if(qty!==productQtyFilterNum) return false;
+    }
     return true;
   });
   const rev=log.reduce((s,e)=>s+(e.total||0),0);
