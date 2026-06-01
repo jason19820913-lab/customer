@@ -410,7 +410,7 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
           <label style="font-size:12px;color:var(--brown);">👨‍⚕️ 當班醫師 <span style="color:#aaa;font-weight:400;">(選填)</span></label>
           <div style="position:relative;">
             <input class="fg-input" type="text" id="staffDoctor" placeholder="搜尋醫師..." autocomplete="off"
-              oninput="filterModalDD('doctor')" onfocus="showModalDD('doctor')" ontouchend="showModalDD('doctor')">
+              oninput="filterModalDD('doctor')" onfocus="showModalDD('doctor')" ontouchend="showModalDD('doctor')" onblur="syncStaffVal('doctor')">
             <div class="search-dd" id="modalDoctorDd" style="min-width:180px;max-width:280px;"></div>
             <input type="hidden" id="staffDoctorVal">
           </div>
@@ -428,7 +428,7 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
         <div id="mutexStaffDiv" class="form-group">
           <div style="position:relative;">
             <input class="fg-input" type="text" id="staffStaff" placeholder="搜尋櫃檯人員..." autocomplete="off"
-              oninput="filterModalDD('staff')" onfocus="showModalDD('staff')" ontouchend="showModalDD('staff')">
+              oninput="filterModalDD('staff')" onfocus="showModalDD('staff')" ontouchend="showModalDD('staff')" onblur="syncStaffVal('staff')">
             <div class="search-dd" id="modalStaffDd" style="min-width:180px;max-width:280px;"></div>
             <input type="hidden" id="staffStaffVal">
           </div>
@@ -436,7 +436,7 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
         <div id="mutexNurseDiv" class="form-group" style="display:none;">
           <div style="position:relative;">
             <input class="fg-input" type="text" id="staffNurse" placeholder="搜尋護理師..." autocomplete="off"
-              oninput="filterModalDD('nurse')" onfocus="showModalDD('nurse')" ontouchend="showModalDD('nurse')">
+              oninput="filterModalDD('nurse')" onfocus="showModalDD('nurse')" ontouchend="showModalDD('nurse')" onblur="syncStaffVal('nurse')">
             <div class="search-dd" id="modalNurseDd" style="min-width:180px;max-width:280px;"></div>
             <input type="hidden" id="staffNurseVal">
           </div>
@@ -444,7 +444,7 @@ select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://ww
         <div id="mutexPharmaDiv" class="form-group" style="display:none;">
           <div style="position:relative;">
             <input class="fg-input" type="text" id="staffPharma" placeholder="搜尋藥師..." autocomplete="off"
-              oninput="filterModalDD('pharma')" onfocus="showModalDD('pharma')" ontouchend="showModalDD('pharma')">
+              oninput="filterModalDD('pharma')" onfocus="showModalDD('pharma')" ontouchend="showModalDD('pharma')" onblur="syncStaffVal('pharma')">
             <div class="search-dd" id="modalPharmaDd" style="min-width:180px;max-width:280px;"></div>
             <input type="hidden" id="staffPharmaVal">
           </div>
@@ -1882,6 +1882,22 @@ function renderModalDDs(){
     dd.style.display=names.length?'block':'none';
   });
 }
+function syncStaffVal(roleKey){
+  const R=roleKey.charAt(0).toUpperCase()+roleKey.slice(1);
+  const inp=document.getElementById('staff'+R);
+  const val=document.getElementById('staff'+R+'Val');
+  if(!inp||!val) return;
+  const typed=inp.value.trim();
+  if(!typed){ val.value=''; return; }
+  // 如果已有 Val（從下拉選的），保留
+  if(val.value&&val.value===typed) return;
+  // 手動輸入：直接用輸入的值寫入 Val
+  val.value=typed;
+  // 隱藏下拉
+  const dd=document.getElementById('modal'+R+'Dd');
+  if(dd) dd.style.display='none';
+}
+
 function showModalDD(roleKey){
   const role=roleKey.charAt(0).toUpperCase()+roleKey.slice(1);
   filterModalDD(roleKey);
@@ -1926,6 +1942,8 @@ async function doCheckout(){
   const total=items.reduce((s,i)=>s+i.price,0);
   const clinic=document.getElementById('clinicSelect').value;
   // 以 input 顯示值為準（空白就當空），不用 hidden Val
+  // 先同步所有手動輸入的值到 Val
+  ['doctor','staff','nurse','pharma'].forEach(function(r){ syncStaffVal(r); });
   const doctorInp=document.getElementById('staffDoctor');
   const staffInp=document.getElementById('staffStaff');
   const nurseInp=document.getElementById('staffNurse');
@@ -1975,12 +1993,13 @@ async function doCheckout(){
   // 建立實際結帳金額對應表（cat-name → 實際單包均價）
   // 讓 salesAmount 用實際付款金額而非原價計算
   const actualPriceMap={};
+  // 分潤用實際結帳金額計算（不含身份折扣，用原始商品金額）
   items.forEach(it=>{
     if(it.isDiscount) return;
-    // 群組商品（蛋白代餐/Q飽）：用實際金額除以總包數得均價
     if(it.group==='protein'||it.group==='mct'){
       const grpPs=products.filter(p=>p.group===it.group&&(cart[p.id]||0)>0);
       const grpTot=grpPs.reduce((s,p)=>s+(cart[p.id]||0),0);
+      // 用原始商品金額（it.price）不扣除身份折扣，讓分潤按原價計算
       const actualPerPack=grpTot>0?it.price/grpTot:0;
       grpPs.forEach(p=>{ actualPriceMap[p.id]=actualPerPack; });
     }
