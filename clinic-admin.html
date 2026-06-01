@@ -379,7 +379,7 @@ tbody tr:hover td{background:var(--sage-pale);}
       <div style="display:flex;gap:5px;flex-wrap:wrap;" id="clinicFilterBtns"></div>
     </div>
     <div class="stat-grid">
-      <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-num" id="statRev">NT$ 0</div><div class="stat-label">今日總營收</div></div>
+      <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-num" id="statRev">NT$ 0</div><div class="stat-label">今日總營收</div><div id="statRevDetail" style="font-size:10px;color:#888;margin-top:4px;line-height:1.8;"></div></div>
       <div class="stat-card"><div class="stat-icon">🧾</div><div class="stat-num" id="statOrders">0</div><div class="stat-label">今日訂單數</div></div>
       <div class="stat-card"><div class="stat-icon">👨‍⚕️</div><div class="stat-num" id="statDr">NT$ 0</div><div class="stat-label">醫師抽成</div></div>
       <div class="stat-card"><div class="stat-icon">💁</div><div class="stat-num" id="statSt">NT$ 0</div><div class="stat-label">櫃檯抽成</div></div>
@@ -1442,6 +1442,12 @@ function renderStats(){
 
   document.getElementById('statRev').textContent='NT$'+rev.toLocaleString();
   document.getElementById('statOrders').textContent=log.length;
+  const cashRev=log.filter(e=>e.payMethod==='cash').reduce((s,e)=>s+(e.total||0),0);
+  const transferRev=log.filter(e=>e.payMethod!=='cash').reduce((s,e)=>s+(e.total||0),0);
+  const detailEl=document.getElementById('statRevDetail');
+  if(detailEl) detailEl.innerHTML=
+    '💵 現金 <strong>NT$'+cashRev.toLocaleString()+'</strong><br>'+
+    '🏦 轉帳 <strong>NT$'+transferRev.toLocaleString()+'</strong>';
   document.getElementById('statDr').textContent='NT$'+tdr.toLocaleString();
   document.getElementById('statSt').textContent='NT$'+tst.toLocaleString();
   document.getElementById('statNu').textContent='NT$'+tnu.toLocaleString();
@@ -1518,9 +1524,11 @@ function renderStats(){
     [['doctor',e.doctor,cm.dr],['staff',e.staff,cm.st],['nurse',e.nurse,cm.nu],['pharma',e.pharma,cm.ph]].forEach(([role,name,amt])=>{
       if(!name) return;
       const key=name+'|'+role;
-      if(!commByPerson[key]) commByPerson[key]={name,role,total:0,sales:0,orders:0};
+      if(!commByPerson[key]) commByPerson[key]={name,role,total:0,sales:0,cashSales:0,transferSales:0,orders:0};
       commByPerson[key].total+=amt;
       commByPerson[key].sales+=(e.total||0);
+      if(e.payMethod==='cash') commByPerson[key].cashSales+=(e.total||0);
+      else commByPerson[key].transferSales+=(e.total||0);
       commByPerson[key].orders++;
     });
   });
@@ -1541,9 +1549,15 @@ function renderStats(){
             </div>
           </div>
           <div style="display:flex;flex-direction:column;gap:6px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;background:#F8FAF8;border-radius:8px;padding:7px 10px;">
-              <span style="font-size:11px;color:#888;font-weight:500;">銷售金額</span>
-              <span style="font-size:13px;font-weight:700;color:var(--charcoal);">NT$${p.sales.toLocaleString()}</span>
+            <div style="background:#F8FAF8;border-radius:8px;padding:7px 10px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <span style="font-size:11px;color:#888;font-weight:500;">銷售金額</span>
+                <span style="font-size:13px;font-weight:700;color:var(--charcoal);">NT$${p.sales.toLocaleString()}</span>
+              </div>
+              <div style="display:flex;gap:8px;font-size:10px;color:#888;">
+                <span>💵 現金 <strong style="color:#555;">NT$${p.cashSales.toLocaleString()}</strong></span>
+                <span>🏦 轉帳 <strong style="color:#555;">NT$${p.transferSales.toLocaleString()}</strong></span>
+              </div>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;background:${roleColor[p.role]||'#6B8F71'}18;border-radius:8px;padding:7px 10px;">
               <span style="font-size:11px;color:#888;font-weight:500;">分潤</span>
