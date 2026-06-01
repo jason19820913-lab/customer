@@ -78,7 +78,7 @@ header{background:var(--charcoal);height:var(--hh);padding:0 16px;display:flex;a
 .fg-input{height:36px;border:1.5px solid #D8E8DA;border-radius:var(--r-sm);padding:0 10px;font-family:inherit;font-size:12px;color:var(--charcoal);background:var(--cream);outline:none;transition:border-color .2s,box-shadow .2s;-webkit-appearance:none;appearance:none;}
 .fg-input:focus{border-color:var(--sage);box-shadow:0 0 0 3px rgba(107,143,113,.15);background:#fff;}
 select.fg-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236B8F71' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;padding-right:26px;}
-.search-dd{position:fixed;background:#fff;border:1.5px solid var(--sage);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:999;height:240px;overflow-y:scroll;display:none;margin-top:4px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;}
+.search-dd{position:fixed;background:#fff;border:1.5px solid var(--sage);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:99999;height:240px;overflow-y:scroll;display:none;margin-top:4px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;}
 .search-dd.open{display:block;}
 .dd-item{padding:11px 14px;font-size:13px;cursor:pointer;border-bottom:1px solid #F0F4F1;transition:background .1s;}
 .dd-item:last-child{border-bottom:none;}
@@ -1911,11 +1911,39 @@ function filterModalDD(roleKey){
   const staffData=getStaff();
   const lists={doctor:staffData.doctors||[],staff:staffData.staff||[],nurse:staffData.nurses||[],pharma:staffData.pharmas||[]};
   const q=(document.getElementById('staff'+role)?.value||'').trim();
+  const inp=document.getElementById('staff'+role);
   const dd=document.getElementById('modal'+role+'Dd');
-  if(!dd) return;
+  if(!dd||!inp) return;
   const filtered=lists[roleKey]?.filter(n=>!q||n.includes(q))||[];
+  if(!filtered.length){ dd.style.display='none'; return; }
   dd.innerHTML=filtered.map(n=>`<div class="dd-item" onclick="selectModalDD('${role}','${n}')">${n}</div>`).join('');
-  dd.style.display=filtered.length?'block':'none';
+
+  // 動態定位：計算輸入框的視窗位置，決定往上還是往下展開
+  const rect=inp.getBoundingClientRect();
+  const ddH=Math.min(filtered.length*42, 220); // 最多 220px
+  const spaceBelow=window.innerHeight-rect.bottom-8;
+  const spaceAbove=rect.top-8;
+  let topPos;
+  if(spaceBelow>=ddH){
+    topPos=rect.bottom+4; // 往下
+  } else if(spaceAbove>=ddH){
+    topPos=rect.top-ddH-4; // 往上
+  } else {
+    // 空間都不夠：用較大的那邊，並限制高度
+    if(spaceBelow>=spaceAbove){
+      topPos=rect.bottom+4;
+      dd.style.height=Math.max(80,spaceBelow-8)+'px';
+    } else {
+      topPos=8;
+      dd.style.height=Math.max(80,spaceAbove-8)+'px';
+    }
+  }
+  dd.style.position='fixed';
+  dd.style.left=rect.left+'px';
+  dd.style.top=topPos+'px';
+  dd.style.width=Math.max(200,rect.width)+'px';
+  dd.style.zIndex='99999'; // 確保在 modal 上方
+  dd.style.display='block';
 }
 function selectModalDD(role,name){
   document.getElementById('staff'+role).value=name;
