@@ -403,6 +403,16 @@ tbody tr:hover td{background:var(--sage-pale);}
           <option value="">全部備註</option>
           <option value="__none__">無備註</option>
         </select>
+        <div style="display:flex;align-items:center;gap:4px;background:#F0F5F1;border:1.5px solid #D0DEAD;border-radius:10px;padding:3px 8px;">
+          <span style="font-size:10px;color:var(--brown);white-space:nowrap;">商品篩選</span>
+          <select id="productQtyFilterCat" style="font-size:11px;border:none;background:transparent;color:var(--brown);font-family:inherit;cursor:pointer;max-width:100px;" onchange="renderStats()">
+            <option value="">全部商品</option>
+          </select>
+          <span style="font-size:10px;color:#888;">=</span>
+          <input type="number" id="productQtyFilterNum" min="0" placeholder="包數"
+            style="font-size:11px;border:none;background:transparent;width:48px;color:var(--charcoal);font-family:inherit;"
+            oninput="renderStats()">
+        </div>
         <button class="btn-sm" onclick="loadSalesFromSheet()" style="background:var(--sage);color:#fff;border-color:var(--sage);">☁️ 從 Sheet 載入</button>
         <button class="btn-sm" onclick="clearLog()">🗑️ 清除本機</button>
       </div>
@@ -1365,6 +1375,22 @@ function syncStatsScroll(){
 function renderStats(){
   renderClinicFilterBtns();
   renderRemarkFilter();
+  // 動態填入商品分類篩選選單
+  const catSel=document.getElementById('productQtyFilterCat');
+  if(catSel){
+    const allLog=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
+    const catSet=new Set();
+    allLog.forEach(e=>{
+      if(e.itemQty) Object.keys(e.itemQty).forEach(k=>{
+        const dash=k.indexOf('-');
+        const cat=dash>0?k.slice(0,dash):k;
+        catSet.add(cat);
+      });
+    });
+    const curCatVal=catSel.value;
+    catSel.innerHTML='<option value="">全部商品</option>'+
+      [...catSet].sort().map(cat=>`<option value="${cat}"${cat===curCatVal?' selected':''}>${cat}</option>`).join('');
+  }
   const allLog=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
   // 日期過濾：統一用 "YYYY-MM-DD" 字串比較，避免時區問題
   function toDateStr(date){
@@ -1429,6 +1455,9 @@ function renderStats(){
   document.getElementById('statsDateLabel').textContent=(labelMap[activeDateMode]||'')+'銷售概覽'+(activeCF?' · '+activeCF:'');
 
   const activeRemark=document.getElementById('remarkFilter')?.value||'';
+  const productQtyFilterCat=document.getElementById('productQtyFilterCat')?.value||'';
+  const productQtyFilterNum=parseInt(document.getElementById('productQtyFilterNum')?.value)||0;
+
   const log=allLog.filter(e=>{
     if(!inDateRange(e)) return false;
     if(activeCF&&(e.clinic||'')!==activeCF) return false;
