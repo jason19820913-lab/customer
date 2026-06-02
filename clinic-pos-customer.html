@@ -1988,6 +1988,16 @@ async function doCheckout(){
   const chartNum=document.getElementById('chartNumber').value.trim();
   payMethod=document.getElementById('pinPayMethod').value;
   const remark=document.getElementById('pinRemark')?.value||'';
+
+  // 驗證：櫃檯/護理師/藥師至少填一個
+  if(!staffV && !nurseV && !pharmaV){
+    toast('⚠️ 請至少填寫櫃檯、護理師或藥師其中一位');
+    // 重新打開 pinModal 讓使用者補填
+    document.getElementById('pinModal').classList.add('open');
+    const footerEl=document.getElementById('checkoutFooter');
+    if(footerEl) footerEl.style.display='block';
+    return;
+  }
   // 記住當班人員
   if(document.getElementById('rememberStaff')?.checked){
     localStorage.setItem('lastStaff',JSON.stringify({
