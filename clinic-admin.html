@@ -392,6 +392,17 @@ tbody tr:hover td{background:var(--sage-pale);}
     <div id="productSummaryGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:20px;"></div>
 
     <div class="section-title" style="margin-top:8px;">
+      <span>商品銷售明細</span>
+      <button class="btn-sm" onclick="exportProductReport()" style="margin-left:auto;font-size:10px;">📊 匯出 CSV</button>
+    </div>
+    <div class="tbl-wrap" style="margin-bottom:20px;">
+      <table id="productReportTable" style="min-width:600px;">
+        <thead id="productReportHead"></thead>
+        <tbody id="productReportBody"></tbody>
+      </table>
+    </div>
+
+    <div class="section-title" style="margin-top:8px;">
       <span>人員分潤摘要</span>
     </div>
     <div id="commSummaryGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:20px;"></div>
@@ -1360,6 +1371,27 @@ function renderRemarkFilter(){
     getRemarks().map(r=>`<option value="${r}"${r===cur?' selected':''}>${r}</option>`).join('');
 }
 
+function exportProductReport(){
+  const data=window._productReportData||[];
+  if(!data.length){toast('⚠️ 無資料可匯出');return;}
+  const rows=[['商品名稱','總數量','7包組合(組)','7包組合(包)','7包組合銷售額','7包以上(筆)','7包以上(包)','7包以上銷售額','銷售金額合計']];
+  data.forEach(r=>{
+    const gs=window.GROUP_SETS_CSV&&window.GROUP_SETS_CSV[r.cat];
+    rows.push([r.cat,r.totalQty,
+      r.set1Qty>0?Math.round(r.set1Qty/7):'',r.set1Qty||'',r.set1Rev||'',
+      r.set2Count||'',r.set2Qty||'',r.set2Rev||'',
+      r.totalRev]);
+  });
+  const csv=rows.map(r=>r.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  const now=new Date();
+  a.download='商品銷售報表_'+now.toLocaleDateString('zh-TW').replace(/\//g,'')+'.csv';
+  a.click();
+  toast('✅ 已匯出 CSV');
+}
+
 function syncStatsScroll(){
   const wrap=document.getElementById('statsTblWrap');
   const mirror=document.getElementById('statsScrollMirror');
@@ -1550,6 +1582,132 @@ function renderStats(){
           '</div>';
       }).join('');
     }
+  }
+
+  // ── 商品銷售明細表 ──
+  // 蛋白代餐/Q飽：分7包一組(540/600)和7包以上(500/組)
+  const GROUP_SETS={
+    '蛋白代餐':{setSize:7, set1Price:540, set2Price:500},
+    'Q飽纖燃飲':{setSize:7, set1Price:600, set2Price:500}
+  };
+
+  // 每筆訂單計算各 cat 的包數和銷售額
+  const reportRows=[]; // 最終攤平的報表列
+
+  // 先彙總每個 cat 的總包數
+  const catMap={};
+  log.forEach(e=>{
+    if(!e.itemQty) return;
+    // 計算各 cat 包數
+    const orderCats={};
+    Object.entries(e.itemQty).forEach(([k,qty])=>{
+      if(!qty) return;
+      const dash=k.indexOf('-');
+      const cat=dash>0?k.slice(0,dash):k;
+      orderCats[cat]=(orderCats[cat]||0)+qty;
+    });
+    Object.entries(orderCats).forEach(([cat,qty])=>{
+      if(!catMap[cat]) catMap[cat]={
+        cat, totalQty:0,
+        set1Count:0, set1Qty:0,   // 一組（7包）
+        set2Count:0, set2Qty:0,   // 7包以上
+        otherQty:0, otherRev:0    // 非群組商品
+      };
+      catMap[cat].totalQty+=qty;
+      if(GROUP_SETS[cat]){
+        const {setSize,set1Price,set2Price}=GROUP_SETS[cat];
+        const sets=Math.floor(qty/setSize);
+        if(sets===1){ catMap[cat].set1Count++; catMap[cat].set1Qty+=qty; }
+        else if(sets>1){ catMap[cat].set2Count++; catMap[cat].set2Qty+=qty; }
+        else { catMap[cat].otherQty+=qty; } // 散包
+      } else {
+        // 非群組商品：用商品定價估算銷售額
+        const prod=allProducts.find(p=>p.cat===cat||p.name===cat);
+        catMap[cat].otherQty+=qty;
+        catMap[cat].otherRev+=(prod?.price||0)*qty;
+      }
+    });
+  });
+
+  // 計算銷售額
+  Object.values(catMap).forEach(r=>{
+    if(GROUP_SETS[r.cat]){
+      const {setSize,set1Price,set2Price}=GROUP_SETS[r.cat];
+      r.set1Rev=Math.round(r.set1Qty/setSize)*set1Price;
+      // 7包以上：第1組540，後續每組500
+      let rev2=0;
+      // 逐筆算（因每筆組數不同）
+      // 簡化：用平均每組500估算（多組時第1組540，後面500）
+      if(r.set2Qty>0){
+        // 重新從 log 撈精確值
+        rev2=log.reduce((s,e)=>{
+          const qty=Object.entries(e.itemQty||{})
+            .filter(([k])=>k===r.cat||k.startsWith(r.cat+'-'))
+            .reduce((a,[,v])=>a+v,0);
+          const sets=Math.floor(qty/setSize);
+          if(sets>1){
+            return s+set1Price+(sets-1)*set2Price;
+          }
+          return s;
+        },0);
+      }
+      r.set2Rev=rev2;
+      r.totalRev=r.set1Rev+r.set2Rev+r.otherRev;
+    } else {
+      r.totalRev=r.otherRev;
+    }
+  });
+
+  const reportHead=document.getElementById('productReportHead');
+  const reportBody=document.getElementById('productReportBody');
+  if(reportHead&&reportBody){
+    reportHead.innerHTML=`<tr>
+      <th style="white-space:nowrap;">商品名稱</th>
+      <th style="text-align:center;white-space:nowrap;">總數量</th>
+      <th style="white-space:nowrap;">明細</th>
+      <th style="text-align:right;white-space:nowrap;">銷售金額</th>
+    </tr>`;
+    const entries=Object.values(catMap).sort((a,b)=>b.totalQty-a.totalQty);
+    if(!entries.length){
+      reportBody.innerHTML='<tr class="empty-row"><td colspan="4">尚無資料</td></tr>';
+    } else {
+      reportBody.innerHTML=entries.map(r=>{
+        let detailHtml='';
+        if(GROUP_SETS[r.cat]){
+          const {setSize,set1Price,set2Price}=GROUP_SETS[r.cat];
+          const parts=[];
+          if(r.set1Qty>0) parts.push(
+            `<span style="font-size:11px;">▪ 7包組合（NT$${set1Price}/組）：`+
+            `<strong>${Math.round(r.set1Qty/setSize)}組 / ${r.set1Qty}包</strong>`+
+            ` → NT$${r.set1Rev.toLocaleString()}</span>`
+          );
+          if(r.set2Qty>0){
+            const sets2total=log.reduce((s,e)=>{
+              const qty=Object.entries(e.itemQty||{}).filter(([k])=>k===r.cat||k.startsWith(r.cat+'-')).reduce((a,[,v])=>a+v,0);
+              return s+(Math.floor(qty/setSize)>1?1:0);
+            },0);
+            parts.push(
+              `<span style="font-size:11px;">▪ 7包以上（每組NT$${set2Price}）：`+
+              `<strong>${sets2total}筆 / ${r.set2Qty}包</strong>`+
+              ` → NT$${r.set2Rev.toLocaleString()}</span>`
+            );
+          }
+          if(r.otherQty>0) parts.push(
+            `<span style="font-size:11px;color:#aaa;">▪ 散包：${r.otherQty}包</span>`
+          );
+          detailHtml=parts.join('<br>');
+        } else {
+          detailHtml=`<span style="font-size:11px;color:#888;">${r.totalQty} 件</span>`;
+        }
+        return `<tr>
+          <td style="font-weight:700;white-space:nowrap;">${r.cat}</td>
+          <td style="text-align:center;font-size:18px;font-weight:900;color:var(--sage);">${r.totalQty}</td>
+          <td>${detailHtml}</td>
+          <td style="text-align:right;white-space:nowrap;font-weight:700;color:var(--brown);">NT$${r.totalRev.toLocaleString()}</td>
+        </tr>`;
+      }).join('');
+    }
+    window._productReportData=entries;
   }
 
   // 人員分潤摘要卡片
