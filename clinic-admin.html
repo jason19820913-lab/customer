@@ -1594,38 +1594,50 @@ function renderStats(){
   // 每筆訂單計算各 cat 的包數和銷售額
   const reportRows=[]; // 最終攤平的報表列
 
-  // 先彙總每個 cat 的總包數
+  // 先彙總：群組商品用 cat，非群組用 name（商品名稱）
   const catMap={};
   log.forEach(e=>{
     if(!e.itemQty) return;
-    // 計算各 cat 包數
-    const orderCats={};
     Object.entries(e.itemQty).forEach(([k,qty])=>{
       if(!qty) return;
       const dash=k.indexOf('-');
       const cat=dash>0?k.slice(0,dash):k;
-      orderCats[cat]=(orderCats[cat]||0)+qty;
-    });
-    Object.entries(orderCats).forEach(([cat,qty])=>{
-      if(!catMap[cat]) catMap[cat]={
-        cat, totalQty:0,
-        set1Count:0, set1Qty:0,   // 一組（7包）
-        set2Count:0, set2Qty:0,   // 7包以上
-        otherQty:0, otherRev:0    // 非群組商品
+      const name=dash>0?k.slice(dash+1):k;
+      const isGroup=!!GROUP_SETS[cat];
+      // 群組商品用 cat 當 key，非群組用完整 name（cat-name 或 name）
+      const mapKey=isGroup?cat:k;
+      const displayName=isGroup?cat:name;
+
+      if(!catMap[mapKey]) catMap[mapKey]={
+        cat:displayName, isGroup,
+        totalQty:0,
+        set1Count:0, set1Qty:0,
+        set2Count:0, set2Qty:0,
+        otherQty:0, otherRev:0
       };
-      catMap[cat].totalQty+=qty;
-      if(GROUP_SETS[cat]){
-        const {setSize,set1Price,set2Price}=GROUP_SETS[cat];
-        const sets=Math.floor(qty/setSize);
-        if(sets===1){ catMap[cat].set1Count++; catMap[cat].set1Qty+=qty; }
-        else if(sets>1){ catMap[cat].set2Count++; catMap[cat].set2Qty+=qty; }
-        else { catMap[cat].otherQty+=qty; } // 散包
+      catMap[mapKey].totalQty+=qty;
+
+      if(isGroup){
+        // 群組商品：累加包數，後面統一按訂單算組合
+        catMap[mapKey].otherQty+=qty;
       } else {
-        // 非群組商品：用商品定價估算銷售額
-        const prod=allProducts.find(p=>p.cat===cat||p.name===cat);
-        catMap[cat].otherQty+=qty;
-        catMap[cat].otherRev+=(prod?.price||0)*qty;
+        // 非群組商品：直接按件計算銷售額
+        const prod=allProducts.find(p=>p.name===name&&p.cat===cat)||allProducts.find(p=>p.name===name);
+        catMap[mapKey].otherQty+=qty;
+        catMap[mapKey].otherRev+=(prod?.price||0)*qty;
       }
+    });
+
+    // 群組商品：按訂單計算組合（避免口味重複計算）
+    Object.keys(GROUP_SETS).forEach(grpCat=>{
+      const {setSize}=GROUP_SETS[grpCat];
+      const orderGrpQty=Object.entries(e.itemQty||{})
+        .filter(([k])=>k===grpCat||k.startsWith(grpCat+'-'))
+        .reduce((s,[,v])=>s+v,0);
+      if(!orderGrpQty||!catMap[grpCat]) return;
+      const sets=Math.floor(orderGrpQty/setSize);
+      if(sets===1){ catMap[grpCat].set1Count++; catMap[grpCat].set1Qty+=orderGrpQty; catMap[grpCat].otherQty-=orderGrpQty; }
+      else if(sets>1){ catMap[grpCat].set2Count++; catMap[grpCat].set2Qty+=orderGrpQty; catMap[grpCat].otherQty-=orderGrpQty; }
     });
   });
 
