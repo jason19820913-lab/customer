@@ -1646,7 +1646,7 @@ function renderStats(){
             .reduce((a,[,v])=>a+v,0);
           const sets=Math.floor(qty/setSize);
           if(sets>1){
-            return s+set1Price+(sets-1)*set2Price;
+            return s+sets*set2Price; // 2組以上全部用 set2Price
           }
           return s;
         },0);
