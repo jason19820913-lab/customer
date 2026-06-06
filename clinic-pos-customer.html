@@ -1193,10 +1193,19 @@ function buildItems(memberPromoOverride){
     });
 
     // 判斷是否有員工 staffPrice 套用此群組（有的話不享組合價）
-    const hasStaffPriceForGrp=memberPromos.some(mp=>{
-      if(mp.type!=='staffPrice') return false;
+    // hasStaffPriceForGrp：只有優惠價>0（真正員工單價）才跳過組合優惠
+    // 優惠價=0（套組回診）照正常組合計算，只是最後折扣歸零
+    let hasStaffPriceForGrp=false;
+    memberPromos.forEach(mp=>{
+      if(mp.type!=='staffPrice') return;
       const scope=String(mp.scope||'');
-      return scope===`group:${grp}`||scope==='all';
+      if(scope!==`group:${grp}`&&scope!=='all') return;
+      let defP=null;
+      (mp.staffPriceMap||'').replace(/\\n/g,'\n').split(/\n/).forEach(line=>{
+        const m=line.trim().match(/^_default_=([\d.]+)$/);
+        if(m) defP=Number(m[1]);
+      });
+      if(defP!==null && defP>0) hasStaffPriceForGrp=true; // 只有實際有員工單價才設 true
     });
 
     // 找適用此群組的 buyNgetN 促銷
