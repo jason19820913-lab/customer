@@ -1588,7 +1588,7 @@ function renderStats(){
   // 蛋白代餐/Q飽：分7包一組(540/600)和7包以上(500/組)
   const GROUP_SETS={
     '蛋白代餐':{setSize:7, set1Price:540, set2Price:500},
-    'Q飽纖燃飲':{setSize:7, set1Price:600, set2Price:500}
+    'Q飽纖燃飲':{setSize:7, set1Price:600, set2Price:600, unitPrice:100}
   };
 
   // 每筆訂單計算各 cat 的包數和銷售額
@@ -1679,11 +1679,17 @@ function renderStats(){
             .filter(([k])=>k===r.cat||k.startsWith(r.cat+'-'))
             .reduce((a,[,v])=>a+v,0);
           const sets=Math.floor(qty/setSize);
-          if(sets>1) return s+sets*set2Price;
+          if(sets>1) return s+sets*set2Price; // Q飽 set2Price=600，蛋白代餐=500
           return s;
         },0);
       }
+      // 散包收入（不足一組的部分）
+      const normalOtherQty=Math.max(0,r.otherQty-r.voucherOtherQty);
+      const unitPriceForCat=GROUP_SETS[r.cat].unitPrice||0;
+      const otherRevFromUnit=normalOtherQty*unitPriceForCat;
+      r.otherRev=otherRevFromUnit;
       r.set2Rev=rev2;
+      r.totalRev=r.set1Rev+r.set2Rev+r.otherRev;
       // 兌換券組合收入（顯示用，實際為0）
       r.voucherSet1Rev=Math.round(r.voucherSet1Qty/setSize)*set1Price;
       r.voucherSet2Rev=log.reduce((s,e)=>{
@@ -1758,9 +1764,16 @@ function renderStats(){
               ` （原價NT$${r.voucherSet2Rev.toLocaleString()}，實收NT$0）</span>`
             );
           }
-          if(r.otherQty>0) parts.push(
-            `<span style="font-size:11px;color:#aaa;">▪ 散包：${r.otherQty}包</span>`
-          );
+          if(r.otherQty>0){
+            const uPrice=GROUP_SETS[r.cat].unitPrice||0;
+            const normalOther=Math.max(0,r.otherQty-r.voucherOtherQty);
+            parts.push(
+              `<span style="font-size:11px;color:#aaa;">▪ 散包：${normalOther}包`+
+              (uPrice&&normalOther?` → NT$${(normalOther*uPrice).toLocaleString()}`:``) +
+              (r.voucherOtherQty?` / 🎫 兌換券 ${r.voucherOtherQty}包`:``)+
+              `</span>`
+            );
+          }
           // 口味明細
           const flavorEntries=Object.entries(r.flavors||{}).sort((a,b)=>b[1]-a[1]);
           const vFlavorEntries=Object.entries(r.voucherFlavors||{}).sort((a,b)=>b[1]-a[1]);
