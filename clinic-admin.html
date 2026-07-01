@@ -1610,25 +1610,30 @@ function renderStats(){
 
       if(!catMap[mapKey]) catMap[mapKey]={
         cat:displayName, isGroup,
-        totalQty:0,
+        totalQty:0, voucherQty:0,       // 總數量、兌換券數量
         set1Count:0, set1Qty:0,
         set2Count:0, set2Qty:0,
-        otherQty:0, otherRev:0
+        voucherSet1Qty:0, voucherSet2Qty:0, // 兌換券組合數量
+        otherQty:0, otherRev:0,
+        voucherOtherQty:0
       };
+      const isVoucher=(e.identity||'').includes('兌換券');
       catMap[mapKey].totalQty+=qty;
+      if(isVoucher) catMap[mapKey].voucherQty+=qty;
 
       if(isGroup){
-        // 群組商品：累加包數，後面統一按訂單算組合
         catMap[mapKey].otherQty+=qty;
+        if(isVoucher) catMap[mapKey].voucherOtherQty+=qty;
       } else {
-        // 非群組商品：直接按件計算銷售額
         const prod=allProducts.find(p=>p.name===name&&p.cat===cat)||allProducts.find(p=>p.name===name);
         catMap[mapKey].otherQty+=qty;
-        catMap[mapKey].otherRev+=(prod?.price||0)*qty;
+        if(!isVoucher) catMap[mapKey].otherRev+=(prod?.price||0)*qty;
+        if(isVoucher) catMap[mapKey].voucherOtherQty+=qty;
       }
     });
 
-    // 群組商品：按訂單計算組合（避免口味重複計算）
+    // 群組商品：按訂單計算組合
+    const isVoucher=(e.identity||'').includes('兌換券');
     Object.keys(GROUP_SETS).forEach(grpCat=>{
       const {setSize}=GROUP_SETS[grpCat];
       const orderGrpQty=Object.entries(e.itemQty||{})
@@ -1636,34 +1641,50 @@ function renderStats(){
         .reduce((s,[,v])=>s+v,0);
       if(!orderGrpQty||!catMap[grpCat]) return;
       const sets=Math.floor(orderGrpQty/setSize);
-      if(sets===1){ catMap[grpCat].set1Count++; catMap[grpCat].set1Qty+=orderGrpQty; catMap[grpCat].otherQty-=orderGrpQty; }
-      else if(sets>1){ catMap[grpCat].set2Count++; catMap[grpCat].set2Qty+=orderGrpQty; catMap[grpCat].otherQty-=orderGrpQty; }
+      if(sets===1){
+        catMap[grpCat].set1Count++; catMap[grpCat].set1Qty+=orderGrpQty; catMap[grpCat].otherQty-=orderGrpQty;
+        if(isVoucher){ catMap[grpCat].voucherSet1Qty+=orderGrpQty; catMap[grpCat].voucherOtherQty-=orderGrpQty; }
+      } else if(sets>1){
+        catMap[grpCat].set2Count++; catMap[grpCat].set2Qty+=orderGrpQty; catMap[grpCat].otherQty-=orderGrpQty;
+        if(isVoucher){ catMap[grpCat].voucherSet2Qty+=orderGrpQty; catMap[grpCat].voucherOtherQty-=orderGrpQty; }
+      }
     });
   });
 
-  // 計算銷售額
+  // 計算銷售額（排除兌換券）
   Object.values(catMap).forEach(r=>{
     if(GROUP_SETS[r.cat]){
       const {setSize,set1Price,set2Price}=GROUP_SETS[r.cat];
-      r.set1Rev=Math.round(r.set1Qty/setSize)*set1Price;
-      // 7包以上：第1組540，後續每組500
+      // 一般訂單（排除兌換券）
+      const normalSet1Qty=r.set1Qty-r.voucherSet1Qty;
+      const normalSet2Qty=r.set2Qty-r.voucherSet2Qty;
+      r.set1Rev=Math.round(normalSet1Qty/setSize)*set1Price;
       let rev2=0;
-      // 逐筆算（因每筆組數不同）
-      // 簡化：用平均每組500估算（多組時第1組540，後面500）
-      if(r.set2Qty>0){
-        // 重新從 log 撈精確值
+      if(normalSet2Qty>0){
         rev2=log.reduce((s,e)=>{
+          const isVoucher=(e.identity||'').includes('兌換券');
+          if(isVoucher) return s;
           const qty=Object.entries(e.itemQty||{})
             .filter(([k])=>k===r.cat||k.startsWith(r.cat+'-'))
             .reduce((a,[,v])=>a+v,0);
           const sets=Math.floor(qty/setSize);
-          if(sets>1){
-            return s+sets*set2Price; // 2組以上全部用 set2Price
-          }
+          if(sets>1) return s+sets*set2Price;
           return s;
         },0);
       }
       r.set2Rev=rev2;
+      // 兌換券組合收入（顯示用，實際為0）
+      r.voucherSet1Rev=Math.round(r.voucherSet1Qty/setSize)*set1Price;
+      r.voucherSet2Rev=log.reduce((s,e)=>{
+        const isVoucher=(e.identity||'').includes('兌換券');
+        if(!isVoucher) return s;
+        const qty=Object.entries(e.itemQty||{})
+          .filter(([k])=>k===r.cat||k.startsWith(r.cat+'-'))
+          .reduce((a,[,v])=>a+v,0);
+        const sets=Math.floor(qty/setSize);
+        if(sets>1) return s+sets*set2Price;
+        return s;
+      },0);
       r.totalRev=r.set1Rev+r.set2Rev+r.otherRev;
     } else {
       r.totalRev=r.otherRev;
@@ -1688,20 +1709,42 @@ function renderStats(){
         if(GROUP_SETS[r.cat]){
           const {setSize,set1Price,set2Price}=GROUP_SETS[r.cat];
           const parts=[];
-          if(r.set1Qty>0) parts.push(
+          const normalSet1Qty=r.set1Qty-r.voucherSet1Qty;
+          const normalSet2Qty=r.set2Qty-r.voucherSet2Qty;
+          if(normalSet1Qty>0) parts.push(
             `<span style="font-size:11px;">▪ 7包組合（NT$${set1Price}/組）：`+
-            `<strong>${Math.round(r.set1Qty/setSize)}組 / ${r.set1Qty}包</strong>`+
+            `<strong>${Math.round(normalSet1Qty/setSize)}組 / ${normalSet1Qty}包</strong>`+
             ` → NT$${r.set1Rev.toLocaleString()}</span>`
           );
-          if(r.set2Qty>0){
+          if(r.voucherSet1Qty>0) parts.push(
+            `<span style="font-size:11px;color:#E65100;">▪ 🎫 兌換券 7包組合：`+
+            `<strong>${Math.round(r.voucherSet1Qty/setSize)}組 / ${r.voucherSet1Qty}包</strong>`+
+            ` （原價NT$${r.voucherSet1Rev.toLocaleString()}，實收NT$0）</span>`
+          );
+          if(normalSet2Qty>0){
             const sets2total=log.reduce((s,e)=>{
+              const isV=(e.identity||'').includes('兌換券');
+              if(isV) return s;
               const qty=Object.entries(e.itemQty||{}).filter(([k])=>k===r.cat||k.startsWith(r.cat+'-')).reduce((a,[,v])=>a+v,0);
               return s+(Math.floor(qty/setSize)>1?1:0);
             },0);
             parts.push(
               `<span style="font-size:11px;">▪ 7包以上（每組NT$${set2Price}）：`+
-              `<strong>${sets2total}筆 / ${r.set2Qty}包</strong>`+
+              `<strong>${sets2total}筆 / ${normalSet2Qty}包</strong>`+
               ` → NT$${r.set2Rev.toLocaleString()}</span>`
+            );
+          }
+          if(r.voucherSet2Qty>0){
+            const vSets2=log.reduce((s,e)=>{
+              const isV=(e.identity||'').includes('兌換券');
+              if(!isV) return s;
+              const qty=Object.entries(e.itemQty||{}).filter(([k])=>k===r.cat||k.startsWith(r.cat+'-')).reduce((a,[,v])=>a+v,0);
+              return s+(Math.floor(qty/setSize)>1?1:0);
+            },0);
+            parts.push(
+              `<span style="font-size:11px;color:#E65100;">▪ 🎫 兌換券 7包以上：`+
+              `<strong>${vSets2}筆 / ${r.voucherSet2Qty}包</strong>`+
+              ` （原價NT$${r.voucherSet2Rev.toLocaleString()}，實收NT$0）</span>`
             );
           }
           if(r.otherQty>0) parts.push(
@@ -1709,7 +1752,9 @@ function renderStats(){
           );
           detailHtml=parts.join('<br>');
         } else {
-          detailHtml=`<span style="font-size:11px;color:#888;">${r.totalQty} 件</span>`;
+          const normalQty=r.totalQty-r.voucherQty;
+          detailHtml=(normalQty>0?`<span style="font-size:11px;color:#888;">${normalQty} 件</span>`:'')+
+            (r.voucherQty>0?`<span style="font-size:11px;color:#E65100;margin-left:6px;">🎫 兌換券 ${r.voucherQty} 件</span>`:'');
         }
         return `<tr>
           <td style="font-weight:700;white-space:nowrap;">${r.cat}</td>
