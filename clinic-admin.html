@@ -1606,20 +1606,31 @@ function renderStats(){
       const isGroup=!!GROUP_SETS[cat];
       // 群組商品用 cat 當 key，非群組用完整 name（cat-name 或 name）
       const mapKey=isGroup?cat:k;
-      const displayName=isGroup?cat:name;
+      // 非群組且有分類（cat-name 格式）顯示為「分類-名稱」
+      const displayName=isGroup?cat:(dash>0?cat+'-'+name:name);
 
       if(!catMap[mapKey]) catMap[mapKey]={
         cat:displayName, isGroup,
-        totalQty:0, voucherQty:0,       // 總數量、兌換券數量
+        totalQty:0, voucherQty:0,
         set1Count:0, set1Qty:0,
         set2Count:0, set2Qty:0,
-        voucherSet1Qty:0, voucherSet2Qty:0, // 兌換券組合數量
+        voucherSet1Qty:0, voucherSet2Qty:0,
         otherQty:0, otherRev:0,
-        voucherOtherQty:0
+        voucherOtherQty:0,
+        flavors:{}, voucherFlavors:{}  // 口味統計
       };
       const isVoucher=(e.identity||'').includes('兌換券');
       catMap[mapKey].totalQty+=qty;
       if(isVoucher) catMap[mapKey].voucherQty+=qty;
+      // 口味統計（只有群組商品或有 dash 的才記）
+      if(dash>0){
+        const fl=name;
+        if(isVoucher){
+          catMap[mapKey].voucherFlavors[fl]=(catMap[mapKey].voucherFlavors[fl]||0)+qty;
+        } else {
+          catMap[mapKey].flavors[fl]=(catMap[mapKey].flavors[fl]||0)+qty;
+        }
+      }
 
       if(isGroup){
         catMap[mapKey].otherQty+=qty;
@@ -1750,6 +1761,20 @@ function renderStats(){
           if(r.otherQty>0) parts.push(
             `<span style="font-size:11px;color:#aaa;">▪ 散包：${r.otherQty}包</span>`
           );
+          // 口味明細
+          const flavorEntries=Object.entries(r.flavors||{}).sort((a,b)=>b[1]-a[1]);
+          const vFlavorEntries=Object.entries(r.voucherFlavors||{}).sort((a,b)=>b[1]-a[1]);
+          if(flavorEntries.length){
+            parts.push('<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px;">'+
+              flavorEntries.map(([fl,q])=>`<span style="font-size:10px;background:#F0F5F1;border-radius:5px;padding:1px 6px;">${fl} <b>${q}</b></span>`).join('')+
+            '</div>');
+          }
+          if(vFlavorEntries.length){
+            parts.push('<div style="margin-top:2px;display:flex;flex-wrap:wrap;gap:3px;">'+
+              '<span style="font-size:10px;color:#E65100;">🎫</span>'+
+              vFlavorEntries.map(([fl,q])=>`<span style="font-size:10px;background:#FFF3E0;border-radius:5px;padding:1px 6px;color:#E65100;">${fl} <b>${q}</b></span>`).join('')+
+            '</div>');
+          }
           detailHtml=parts.join('<br>');
         } else {
           const normalQty=r.totalQty-r.voucherQty;
