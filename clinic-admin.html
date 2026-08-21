@@ -240,11 +240,16 @@ tbody tr:hover td{background:var(--sage-pale);}
 .pm-item:last-child{border-bottom:none;}
 .pm-item:hover{background:var(--sage-pale);}
 .pm-item.inactive{opacity:.5;}
-.pm-item[draggable="true"]{user-select:none;}
+.pm-item[draggable="true"]{user-select:none;-webkit-user-select:none;}
 .pm-item.drag-over{border-top:2px solid var(--sage);background:var(--sage-pale);}
 .pm-cat-body.drag-over-body{background:var(--sage-pale);outline:2px dashed var(--sage-light);}
 .pm-grid.cat-drag-over{outline:2px solid var(--sage);border-radius:var(--r);opacity:.85;}
 .pm-grid.cat-dragging{opacity:.4;}
+/* 防止拖曳時反白 */
+.pm-item,.pm-grid,.pm-cat-drag,.pm-drag{
+  -webkit-user-select:none;-moz-user-select:none;user-select:none;
+  -webkit-touch-callout:none;
+}
 .pm-cat-header{cursor:default;}
 .pm-cat-drag{cursor:grab;color:#bbb;font-size:14px;flex-shrink:0;margin-right:6px;user-select:none;}
 .pm-cat-drag:active{cursor:grabbing;}
@@ -2262,8 +2267,15 @@ function renderProductManager(){
 let dragSrc=null;
 
 function initDragSort(){
+  // 防止拖曳時頁面捲動和反白
+  document.querySelectorAll('.pm-item,.pm-cat-drag').forEach(el=>{
+    el.addEventListener('touchmove',e=>{ e.preventDefault(); },{passive:false});
+  });
+
   document.querySelectorAll('.pm-item').forEach(el=>{
+    el.setAttribute('draggable','true');
     el.addEventListener('dragstart',e=>{
+      e.stopPropagation();
       dragSrc=el;
       el.style.opacity='.4';
       e.dataTransfer.effectAllowed='move';
