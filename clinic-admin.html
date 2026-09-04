@@ -912,22 +912,7 @@ function checkPin(){
   if(pinBuf===getPin()){
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('appShell').classList.add('visible');
-    // 立即用本機快取渲染所有頁面
-    renderStats();
-    loadClinicData();
-    loadStaffData().then(()=>renderStaffLists()).catch(()=>renderStaffLists());
-    renderProductManager();
-    loadPromoData();
-    loadCommData();
-    renderRemarkChips();
-    renderQuickPicksList();
-    const u=gasUrl();
-    const gsInp=document.getElementById('gsUrlInput');
-    const gsBadge=document.getElementById('gsBadge');
-    if(u&&gsInp) gsInp.value=u;
-    if(u&&gsBadge) gsBadge.classList.add('show');
-    // 背景從 Sheet 更新（不阻塞畫面）
-    setTimeout(()=>{ initApp().catch(()=>{}); }, 300);
+    initApp();
   }else{
     document.getElementById('pinError').textContent='❌ PIN 碼錯誤，請重試';
     pinBuf='';updateDots();setTimeout(()=>document.getElementById('pinError').textContent='',2000);
@@ -937,73 +922,1016 @@ function logout(){document.getElementById('loginScreen').classList.remove('hidde
 
 // ── INIT ──
 async function initApp(){
-  const u=gasUrl();
+  // 立即用本機快取渲染，讓畫面先出現
+  renderStats();
+  loadClinicData(); loadStaffData(); renderStaffLists();
+  renderProductManager();
+  loadPromoData(); loadCommData();
+  renderRemarkChips();
+  renderQuickPicksList();
+  const u = gasUrl();
+  if(u){ document.getElementById('gsUrlInput').value=u; document.getElementById('gsBadge').classList.add('show'); }
+  document.getElementById('statsDateLabel').textContent=new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'short'})+' 銷售概覽';
+
+  // 背景從 Sheet 拉取最新資料（全資料表一次拉）
   if(!u) return;
   try{
-    // 第一批：最重要的資料（商品、人員、院區）
-    const [prodD,staffD,clinicD]=await Promise.all([
+    const [prodD, staffD, clinicD, promoD, commD] = await Promise.all([
       gasRead('商品主檔'),
       gasRead('人員名單'),
       gasRead('院區清單'),
-    ]);
-    if(prodD.status==='ok'&&prodD.rows?.length){
-      const products=prodD.rows.map(r=>{
-        const t={};Object.keys(r).forEach(k=>{t[k]=typeof r[k]==='string'?r[k].trim():r[k];});
-        return{...t,price:Number(t.price)||0,active:String(t.active).toUpperCase()!=='FALSE',catDescription:t.catDescription||'',barcode:t.barcode||''};
-      });
-      localStorage.setItem(PRODUCTS_KEY,JSON.stringify(products));
-      renderProductManager();
-    }
-    if(staffD.status==='ok'&&staffD.rows){
-      const staff={doctors:[],staff:[],nurses:[],pharmas:[]};
-      staffD.rows.forEach(r=>{const role=r['角色'],name=String(r['姓名']||'').trim();if(staff[role]!==undefined&&name)staff[role].push(name);});
-      editStaffData=staff;localStorage.setItem(STAFF_KEY,JSON.stringify(staff));renderStaffLists();
-    }
-    if(clinicD.status==='ok'&&clinicD.rows?.length){
-      const clinics=clinicD.rows.map(r=>String(r['院區名稱']||'').trim()).filter(Boolean);
-      if(clinics.length) localStorage.setItem(CLINIC_KEY,JSON.stringify(clinics));
-    }
-    renderStats();
-
-    // 第二批：促銷、分潤（稍後）
-    const [promoD,commD]=await Promise.all([
       gasRead('促銷活動'),
       gasRead('分潤規則'),
     ]);
-    if(promoD.status==='ok'&&promoD.rows){
+
+    // 商品主檔
+    if(prodD.status==='ok' && prodD.rows?.length){
+      const products = prodD.rows.map(r=>{
+        const trimmed={};
+        Object.keys(r).forEach(k=>{ trimmed[k]=typeof r[k]==='string'?r[k].trim():r[k]; });
+        return { ...trimmed, price:Number(trimmed.price)||0, active:String(trimmed.active).toUpperCase()!=='FALSE' };
+      });
+      localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
+      renderProductManager();
+    }
+
+    // 人員名單
+    if(staffD.status==='ok' && staffD.rows){
+      const staff={doctors:[],staff:[],nurses:[],pharmas:[]};
+      staffD.rows.forEach(r=>{
+        const role=r['角色'], name=String(r['姓名']||'').trim();
+        if(staff[role]!==undefined && name) staff[role].push(name);
+      });
+      editStaffData=staff;
+      localStorage.setItem(STAFF_KEY, JSON.stringify(staff));
+      renderStaffLists();
+    }
+
+    // 院區清單
+    if(clinicD.status==='ok' && clinicD.rows){
+      const clinics=clinicD.rows.map(r=>String(r['院區名稱']||'').trim()).filter(Boolean);
+      if(clinics.length){ editClinics=clinics; localStorage.setItem(CLINIC_KEY, JSON.stringify(clinics)); renderClinicChips(); }
+    }
+
+    // 促銷活動
+    if(promoD.status==='ok' && promoD.rows){
       const promos=promoD.rows.map(r=>({...r,
-        buyQty:Number(r.buyQty)||0,freeQty:Number(r.freeQty)||0,
-        discountValue:Number(r.discountValue)||0,
-        active:String(r.active).toUpperCase()!=='FALSE',
-        noComm:String(r.noComm).toUpperCase()==='TRUE',
-        noCommDoctor:String(r.noCommDoctor).toUpperCase()==='TRUE',
+        buyQty:Number(r.buyQty)||0, freeQty:Number(r.freeQty)||0, discountValue:Number(r.discountValue)||0,
         maxQty:Number(r.maxQty)||0
       }));
-      localStorage.setItem(PROMO_KEY,JSON.stringify(promos));loadPromoData();
-    }
-    if(commD.status==='ok'&&commD.rows?.length){
-      const rows=commD.rows.map(r=>{const t={};Object.keys(r).forEach(k=>{t[k]=typeof r[k]==='string'?r[k].trim():r[k];});return t;});
-      localStorage.setItem(COMM_KEY,JSON.stringify(rows));loadCommData();
+      editPromos=promos;
+      localStorage.setItem(PROMO_KEY, JSON.stringify(promos));
     }
 
-    // 第三批：備註、快選（最後背景）
-    gasRead('備註清單').then(rd=>{
-      if(rd?.status==='ok'&&rd.rows?.length){
-        const remarks=rd.rows.map(r=>String(r['備註']||'').trim()).filter(Boolean);
-        if(remarks.length){localStorage.setItem(REMARK_KEY,JSON.stringify(remarks));renderRemarkChips();}
-      } else {
-        const defaults=getRemarks();
-        gasWrite('備註清單',['備註'],defaults.map(r=>({'備註':r}))).catch(()=>{});
+    // 分潤規則
+    if(commD.status==='ok' && commD.rows?.length){
+      editCommRules=commD.rows.map(r=>({...r,
+        doctorValue:Number(r.doctorValue)||0,     doctorThreshold:Number(r.doctorThreshold)||0,
+        staffValue:Number(r.staffValue)||0,       staffThreshold:Number(r.staffThreshold)||0,
+        nurseValue:Number(r.nurseValue)||0,       nurseThreshold:Number(r.nurseThreshold)||0,
+        pharmaValue:Number(r.pharmaValue)||0,     pharmaThreshold:Number(r.pharmaThreshold)||0,
+      }));
+      localStorage.setItem(COMM_KEY, JSON.stringify(editCommRules));
+    }
+
+
+    // 快選方案
+    gasRead('快選方案').then(d=>{
+      if(d?.status==='ok'&&d.rows?.length){
+        const presets=d.rows.map(r=>({name:String(r['名稱']||''),items:String(r['商品清單']||'')})).filter(p=>p.name);
+        if(presets.length){localStorage.setItem(PRESET_KEY,JSON.stringify(presets));renderPresetList();}
       }
     }).catch(()=>{});
-
+    console.info('[initApp] 已從 Sheet 同步所有資料');
     toast('☁️ 資料已從 Google Sheet 同步');
-    document.getElementById('salesSyncStatus').style.display='none';
-  }catch(err){
-    console.warn('[initApp] 同步失敗，使用本機快取',err.message);
+
+    // 備註清單：獨立同步
+    gasRead('備註清單').then(rd=>{
+      if(rd?.status==='ok' && rd.rows?.length){
+        const remarks=rd.rows.map(r=>String(r['備註']||'').trim()).filter(Boolean);
+        if(remarks.length){ localStorage.setItem(REMARK_KEY,JSON.stringify(remarks)); renderRemarkChips(); }
+      } else {
+        // Sheet 沒有備註清單 → 自動建立並寫入預設值
+        const defaults=getRemarks();
+        const rows=defaults.map(r=>({'備註':r}));
+        gasWrite('備註清單',['備註'],rows).then(()=>{
+          toast('📋 已自動建立備註清單');
+          renderRemarkChips();
+  renderQuickPicksList();
+        }).catch(()=>{});
+      }
+    }).catch(()=>{});
+  }catch(e){
+    console.warn('[initApp] Sheet 同步失敗，使用本機快取', e.message);
+  }
+}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+function getMgmtPin(){return localStorage.getItem(MGMT_PIN_KEY)||'1234';}
+let mgmtPinTarget=null;
+let mgmtPinVerified=false; // 本次登入是否已驗證管理密碼
+
+function requireMgmtPin(page){
+  // 已驗證過本次 session 就直接切換
+  if(mgmtPinVerified){ switchPage(page); return; }
+  mgmtPinTarget=page;
+  document.getElementById('mgmtPinInput').value='';
+  document.getElementById('mgmtPinError').textContent='';
+  document.getElementById('mgmtPinModal').style.display='flex';
+  setTimeout(()=>document.getElementById('mgmtPinInput').focus(),100);
+}
+
+function verifyMgmtPin(){
+  const entered=document.getElementById('mgmtPinInput').value;
+  if(entered===getMgmtPin()){
+    mgmtPinVerified=true;
+    document.getElementById('mgmtPinModal').style.display='none';
+    if(mgmtPinTarget) switchPage(mgmtPinTarget);
+    mgmtPinTarget=null;
+  } else {
+    document.getElementById('mgmtPinError').textContent='❌ 密碼錯誤，請重試';
+    document.getElementById('mgmtPinInput').value='';
+    document.getElementById('mgmtPinInput').focus();
   }
 }
 
+function closeMgmtPinModal(){
+  document.getElementById('mgmtPinModal').style.display='none';
+  mgmtPinTarget=null;
+}
+
+// 切換到銷售統計或顧客查詢時，重置管理密碼驗證狀態（保護措施）
+function resetMgmtSession(){
+  mgmtPinVerified=false;
+}
+
+// ── 快選方案管理 ──
+function getQuickPicks(){
+  try{const s=localStorage.getItem('clinicQuickPicks');return s?JSON.parse(s):[];}catch(e){return[];}
+}
+function saveQuickPicks(arr){localStorage.setItem('clinicQuickPicks',JSON.stringify(arr));}
+
+function renderQuickPicksList(){
+  const el=document.getElementById('quickPicksList');
+  if(!el) return;
+  const picks=getQuickPicks();
+  if(!picks.length){el.innerHTML='<div style="font-size:12px;color:#aaa;">尚無快選方案</div>';return;}
+  el.innerHTML=picks.map((pk,i)=>`
+    <div style="background:#F0F5F1;border:1.5px solid #D0DEAD;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <div>
+        <div style="font-size:13px;font-weight:700;">⚡ ${pk.name}</div>
+        <div style="font-size:11px;color:#888;margin-top:2px;">${Object.entries(pk.items||{}).map(([id,q])=>{const p=getAdminProducts().find(x=>x.id===id);return p?p.name+'×'+q:id+'×'+q;}).join('、')}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0;">
+        <button onclick="editPick(${i})" style="font-size:11px;padding:4px 10px;border:1px solid #ccc;border-radius:7px;background:#fff;cursor:pointer;">編輯</button>
+        <button onclick="deletePick(${i})" style="font-size:11px;padding:4px 10px;border:1px solid #ffcdd2;border-radius:7px;background:#fff;color:#c62828;cursor:pointer;">刪除</button>
+      </div>
+    </div>`).join('');
+}
+
+let editingPickIdx=-1;
+function openPickEditor(idx){
+  editingPickIdx=idx!==undefined?idx:-1;
+  const picks=getQuickPicks();
+  const pk=editingPickIdx>=0?picks[editingPickIdx]:{name:'',items:{}};
+  const nameInp=document.getElementById('newPickName');
+  if(nameInp) nameInp.value=pk.name;
+  // 用 modal 選商品
+  const products=getAdminProducts().filter(p=>p.active!==false);
+  const modal=document.createElement('div');
+  modal.id='pickEditorModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:600;display:flex;align-items:center;justify-content:center;padding:14px;';
+  const productRows=products.map(p=>
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#F8FAF8;border-radius:8px;">'+
+    '<span style="font-size:12px;">'+(p.emoji||'📦')+' '+(p.cat?p.cat+'-':'')+p.name+'</span>'+
+    '<input type="number" min="0" value="'+(pk.items[p.id]||0)+'" id="pick_qty_'+p.id+'" style="width:50px;text-align:center;border:1px solid #D0DEAD;border-radius:6px;padding:3px;font-size:12px;">'+
+    '</div>'
+  ).join('');
+  modal.innerHTML=
+    '<div style="background:#fff;border-radius:16px;padding:20px;max-width:500px;width:100%;max-height:80vh;overflow-y:auto;">'+
+    '<h3 style="margin:0 0 14px;">'+(editingPickIdx>=0?'編輯':'新增')+'快選方案</h3>'+
+    '<div class="form-group" style="margin-bottom:14px;">'+
+    '<label style="font-size:11px;font-weight:700;">方案名稱</label>'+
+    '<input class="fg-input" id="pickEditorName" value="'+pk.name+'" placeholder="例：蛋白代餐月療程">'+
+    '</div>'+
+    '<div style="font-size:11px;font-weight:700;color:var(--brown);margin-bottom:8px;">商品數量（0=不加入）</div>'+
+    '<div style="display:grid;gap:6px;">'+productRows+'</div>'+
+    '<div style="display:flex;gap:8px;margin-top:16px;">'+
+    '<button onclick="document.getElementById(&quot;pickEditorModal&quot;).remove()" style="flex:1;padding:10px;border:1.5px solid #ddd;border-radius:10px;background:#fff;cursor:pointer;font-size:13px;">取消</button>'+
+    '<button onclick="savePickEditor()" style="flex:2;padding:10px;border:none;border-radius:10px;background:var(--sage);color:#fff;cursor:pointer;font-size:13px;font-weight:700;">儲存方案</button>'+
+    '</div></div>';
+  document.body.appendChild(modal);
+}
+
+function savePickEditor(){
+  const name=document.getElementById('pickEditorName')?.value.trim();
+  if(!name){toast('⚠️ 請輸入方案名稱');return;}
+  const products=getAdminProducts().filter(p=>p.active!==false);
+  const items={};
+  products.forEach(p=>{
+    const q=parseInt(document.getElementById('pick_qty_'+p.id)?.value)||0;
+    if(q>0) items[p.id]=q;
+  });
+  if(!Object.keys(items).length){toast('⚠️ 請至少設定一項商品');return;}
+  const picks=getQuickPicks();
+  const pk={name,items};
+  if(editingPickIdx>=0) picks[editingPickIdx]=pk;
+  else picks.push(pk);
+  saveQuickPicks(picks);
+  document.getElementById('pickEditorModal')?.remove();
+  renderQuickPicksList();
+  toast('✅ 快選方案已儲存');
+}
+
+function editPick(idx){ openPickEditor(idx); }
+function deletePick(idx){
+  if(!confirm('確定刪除此方案？')) return;
+  const picks=getQuickPicks();
+  picks.splice(idx,1);
+  saveQuickPicks(picks);
+  renderQuickPicksList();
+  toast('🗑️ 已刪除');
+}
+
+// ── 快選方案 ──
+const PRESET_KEY='clinicPresets';
+function deletePreset(idx){
+  if(!confirm('確定刪除此方案？')) return;
+  const presets=getPresets();
+  presets.splice(idx,1);
+  savePresets(presets);
+  renderPresetList();
+  toast('🗑️ 已刪除');
+}
+
+function getRemarks(){
+  try{const s=localStorage.getItem(REMARK_KEY);return s?JSON.parse(s):[...DEFAULT_REMARKS];}catch(e){return[...DEFAULT_REMARKS];}
+}
+function saveRemarks(arr){
+  localStorage.setItem(REMARK_KEY,JSON.stringify(arr));
+  // 同步到 Sheet
+  if(gasUrl()){
+    const rows=arr.map(r=>({'備註':r}));
+    gasWrite('備註清單',['備註'],rows)
+      .then(d=>d.status==='ok'?null:toast('⚠️ 備註同步失敗'))
+      .catch(()=>toast('⚠️ 備註同步網路錯誤'));
+  }
+}
+
+function renderRemarkChips(){
+  const chips=document.getElementById('remarkChips');
+  if(!chips) return;
+  const remarks=getRemarks();
+  if(!remarks.length){chips.innerHTML='<span style="font-size:11px;color:#aaa;">尚無備註選項</span>';return;}
+  chips.innerHTML=remarks.map((r,i)=>`
+    <div style="display:flex;align-items:center;gap:4px;background:#F0F5F1;border:1.5px solid #D0DEAD;border-radius:20px;padding:4px 14px;">
+      <span style="font-size:12px;font-weight:500;">${r}</span>
+      <button onclick="removeRemark(${i})" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:15px;padding:0 0 0 4px;line-height:1;" title="刪除">×</button>
+    </div>`).join('');
+}
+
+function addRemark(){
+  const inp=document.getElementById('newRemarkInput');
+  if(!inp) return;
+  const val=inp.value.trim();
+  if(!val){toast('⚠️ 請輸入備註內容');return;}
+  const remarks=getRemarks();
+  if(remarks.includes(val)){toast('⚠️ 此備註已存在');return;}
+  remarks.push(val);
+  saveRemarks(remarks);
+  inp.value='';
+  renderRemarkChips();
+  renderQuickPicksList();
+  toast('✅ 備註「'+val+'」已新增');
+}
+
+function removeRemark(idx){
+  const remarks=getRemarks();
+  const removed=remarks.splice(idx,1)[0];
+  saveRemarks(remarks);
+  renderRemarkChips();
+  renderQuickPicksList();
+  toast('🗑️ 已刪除「'+removed+'」');
+}
+
+function switchPage(p){
+  ['stats','patient','products','promos','comm','settings'].forEach(n=>{
+    document.getElementById('page'+cap(n)).classList.toggle('active',n===p);
+    document.getElementById('nav'+cap(n)).classList.toggle('active',n===p);
+  });
+  if(p==='patient')connectAdminReader();
+  if(p==='promos')renderPromoList();
+  if(p==='comm')renderCommPage();
+  // 切回一般頁面時重置管理驗證
+  if(p==='stats'||p==='patient') mgmtPinVerified=false;
+  if(p==='settings'){ renderRemarkChips(); renderQuickPicksList(); }
+}
+
+// ── STATS ──
+let activeCF='';
+let activeDateMode='all'; // today/yesterday/week/month/all/custom
+let activeDateFrom='', activeDateTo='';
+
+function filterDate(mode, btn){
+  activeDateMode=mode;
+  activeDateFrom=''; activeDateTo='';
+  const dfEl=document.getElementById('dateFrom'); if(dfEl) dfEl.value='';
+  const dtEl=document.getElementById('dateTo'); if(dtEl) dtEl.value='';
+  document.querySelectorAll('#dateFilterBtns .clinic-filter-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderStats();
+}
+function filterDateCustom(){
+  activeDateFrom=document.getElementById('dateFrom').value;
+  activeDateTo=document.getElementById('dateTo').value;
+  if(activeDateFrom||activeDateTo){
+    activeDateMode='custom';
+    document.querySelectorAll('#dateFilterBtns .clinic-filter-btn').forEach(b=>b.classList.remove('active'));
+  }
+  renderStats();
+}
+function getClinics(){
+  try{const s=localStorage.getItem(CLINIC_KEY);return s?JSON.parse(s):DEFAULT_CLINICS;}catch(e){return DEFAULT_CLINICS;}
+}
+function renderClinicFilterBtns(){
+  const clinics=getClinics();
+  const container=document.getElementById('clinicFilterBtns');
+  if(!container) return;
+  container.innerHTML=[
+    `<button class="clinic-filter-btn${activeCF===''?' active':''}" onclick="filterClinic('',this)">全部</button>`,
+    ...clinics.map(cl=>{
+      const short=cl.replace('院區','');
+      return `<button class="clinic-filter-btn${activeCF===cl?' active':''}" onclick="filterClinic('${cl}',this)">${short}</button>`;
+    })
+  ].join('');
+}
+function filterClinic(c,btn){activeCF=c;document.querySelectorAll('#clinicFilterBtns .clinic-filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderStats();}
+
+const COMM_RULES={'複方蛋白粉':{dr:100,st:20,ph:0},'蛋白代餐':{dr:100,st:10,ph:0},'Q飽纖燃飲':{dr:100,st:10,ph:0},'健健糖':{dr:50,st:10,ph:0},'蛋白棒':{dr:50,st:10,ph:0},'防蚊液':{dr:0,st:0,ph:30},'金鶯涼喉':{dr:0,st:0,ph:10},'好燃對策':{dr:0,st:0,ph:100},'碳水對策':{dr:0,st:0,ph:100},'好輕鬆':{dr:0,st:0,ph:50},'好元氣':{dr:0,st:0,ph:50},'甘好睡寶':{dr:0,st:0,ph:100},'中碳套組':{dr:100,st:10,ph:0},'低碳套組':{dr:100,st:10,ph:0},'拿鐵蛋白棒':{dr:50,st:10,ph:0},'健健粉':{dr:50,st:10,ph:0}};
+// ── 後台分潤計算（與前台邏輯一致）──
+function getAdminProducts(){try{const s=localStorage.getItem(PRODUCTS_KEY);return s?JSON.parse(s):[];}catch(e){return[];}}
+function getAdminCommRules(){ try{const s=localStorage.getItem(COMM_KEY);return s?JSON.parse(s):[];}catch(e){return[];} }
+
+function calcOneRuleAdmin(rule, salePrice, qty, lineTotal){
+  const type=rule.commType||'fixed', val=Number(rule.commValue)||0, thres=Number(rule.commThreshold)||0;
+  if(type==='percent')    return Math.round(salePrice*val/100)*qty;
+  if(type==='threshold')  return (lineTotal>=thres&&thres>0)?val:0;
+  if(type==='salesStage') return (lineTotal>=thres&&thres>0)?val:0;
+  if(type==='salesAmount') return thres>0?Math.floor(lineTotal/thres)*val:0;
+  return val*qty;
+}
+
+function findCommRulesAdmin(product){
+  const rules=getAdminCommRules();
+  const pCat=(product.cat||'').trim();
+  const pGrp=(product.group||'').trim();
+  const pId=(product.id||'').trim();
+  const priority=id=>id===pId?0:id.startsWith('_cat_')?1:id.startsWith('_group_')?2:id==='_all_'?3:4;
+  const byRole={};
+  rules.forEach(r=>{
+    const pid=(r.productId||'').trim();
+    if(pid===pId||pid==='_cat_'+pCat||pid==='_group_'+pGrp||pid==='_all_'){
+      const ex=byRole[r.role];
+      if(!ex||priority(pid)<priority(ex.productId)) byRole[r.role]=r;
+    }
+  });
+  return Object.values(byRole);
+}
+
+function calcComm(itemsStr, hasDoctor, hasStaff, hasNurse, hasPharma){
+  const products=getAdminProducts();
+  let dr=0,st=0,nu=0,ph=0;
+  if(!itemsStr) return{dr,st,nu,ph};
+  const filled={doctor:hasDoctor,staff:hasStaff,nurse:hasNurse,pharma:hasPharma};
+
+  // Step1：解析商品清單
+  const lines=[];
+  itemsStr.split('、').forEach(part=>{
+    const m=part.match(/^(.+?)x(\d+)|^(.+?)×(\d+)/);if(!m)return;
+    const rawName=(m[1]||m[3]).trim(), qty=parseInt(m[2]||m[4])||1;
+    const catPart2=rawName.includes('-')?rawName.split('-')[0].trim():'';
+    const shortName2=(rawName.includes('-')?rawName.split('-').slice(1).join('-'):rawName).trim();
+    let product=products.find(p=>{
+      const pName=(p.name||'').trim(), pCat=(p.cat||'').trim();
+      return catPart2 && pCat===catPart2 && pName===shortName2;
+    }) || products.find(p=>(p.name||'').trim()===shortName2)
+      || products.find(p=>(p.name||'').trim()===rawName.trim());
+    if(!product) return;
+    lines.push({product, qty, price:product.price||0});
+  });
+
+  // Step2：固定/百分比逐件算；salesAmount/threshold 累加後算
+  const ruleAgg={};
+  lines.forEach(({product, qty, price})=>{
+    findCommRulesAdmin(product).forEach(rule=>{
+      if(filled[rule.role]===false) return;
+      const type=rule.commType||'fixed';
+      const key=(rule.productId||'')+'|'+(rule.role||'');
+      if(type==='salesAmount'||type==='threshold'||type==='salesStage'){
+        if(!ruleAgg[key]) ruleAgg[key]={rule, totalLineTotal:0, totalQty:0};
+        ruleAgg[key].totalLineTotal += price*qty;
+        ruleAgg[key].totalQty += qty;
+      } else {
+        const amt=calcOneRuleAdmin(rule,price,qty,price*qty);
+        if(rule.role==='doctor') dr+=amt;
+        else if(rule.role==='staff')  st+=amt;
+        else if(rule.role==='nurse')  nu+=amt;
+        else if(rule.role==='pharma') ph+=amt;
+      }
+    });
+  });
+
+  // Step3：累加型規則用總金額計算
+  Object.values(ruleAgg).forEach(({rule, totalLineTotal, totalQty})=>{
+    const avgPrice=totalQty?totalLineTotal/totalQty:0;
+    const amt=calcOneRuleAdmin(rule,avgPrice,totalQty,totalLineTotal);
+    if(rule.role==='doctor') dr+=amt;
+    else if(rule.role==='staff')  st+=amt;
+    else if(rule.role==='nurse')  nu+=amt;
+    else if(rule.role==='pharma') ph+=amt;
+  });
+
+  return{dr,st,nu,ph};
+}
+function getQty(e,key){
+  if(e.itemQty&&e.itemQty[key]!==undefined)return e.itemQty[key]||0;
+  const esc=key.replace(/[-[\]{}()*+?.,\\^$|#\s]/g,'\\$&');
+  const m=(e.items||'').match(new RegExp(esc+'×(\\d+)'));
+  return m?parseInt(m[1]):0;
+}
+
+// 從 entry 取得四個角色的抽成
+function getEntryComm(e){
+  // 優先使用結帳時已計算並儲存的值
+  if(e.doctorComm!==undefined||e.staffComm!==undefined||e.nurseComm!==undefined||e.pharmaComm!==undefined){
+    return {dr:Number(e.doctorComm)||0, st:Number(e.staffComm)||0, nu:Number(e.nurseComm)||0, ph:Number(e.pharmaComm)||0};
+  }
+  // fallback：舊資料沒有抽成紀錄，依分潤規則+人員填報即時計算
+  return calcComm(e.items||'', !!e.doctor, !!e.staff, !!e.nurse, !!e.pharma);
+}
+
+function renderRemarkFilter(){
+  const sel=document.getElementById('remarkFilter');
+  if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">全部備註</option><option value="__none__">無備註</option>'+
+    getRemarks().map(r=>`<option value="${r}"${r===cur?' selected':''}>${r}</option>`).join('');
+}
+
+function exportProductReport(){
+  const data=window._productReportData||[];
+  if(!data.length){toast('⚠️ 無資料可匯出');return;}
+  const rows=[['商品名稱','總數量','7包組合(組)','7包組合(包)','7包組合銷售額','7包以上(筆)','7包以上(包)','7包以上銷售額','銷售金額合計']];
+  data.forEach(r=>{
+    const gs=window.GROUP_SETS_CSV&&window.GROUP_SETS_CSV[r.cat];
+    rows.push([r.cat,r.totalQty,
+      r.set1Qty>0?Math.round(r.set1Qty/7):'',r.set1Qty||'',r.set1Rev||'',
+      r.set2Count||'',r.set2Qty||'',r.set2Rev||'',
+      r.totalRev]);
+  });
+  const csv=rows.map(r=>r.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  const now=new Date();
+  a.download='商品銷售報表_'+now.toLocaleDateString('zh-TW').replace(/\//g,'')+'.csv';
+  a.click();
+  toast('✅ 已匯出 CSV');
+}
+
+function syncStatsScroll(){
+  const wrap=document.getElementById('statsTblWrap');
+  const mirror=document.getElementById('statsScrollMirror');
+  const mirrorInner=document.getElementById('statsScrollMirrorInner');
+  if(!wrap||!mirror||!mirrorInner) return;
+  // 設定鏡像寬度與表格相同
+  mirrorInner.style.width=wrap.scrollWidth+'px';
+  // 同步捲動
+  mirror.onscroll=function(){ if(wrap.scrollLeft!==mirror.scrollLeft) wrap.scrollLeft=mirror.scrollLeft; };
+  wrap.onscroll=function(){ if(mirror.scrollLeft!==wrap.scrollLeft) mirror.scrollLeft=wrap.scrollLeft; };
+}
+
+function renderStats(){
+  renderClinicFilterBtns();
+  renderRemarkFilter();
+  // 動態填入商品分類篩選選單
+  const catSel=document.getElementById('productQtyFilterCat');
+  if(catSel){
+    const allLog=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
+    const catSet=new Set();
+    allLog.forEach(e=>{
+      if(e.itemQty) Object.keys(e.itemQty).forEach(k=>{
+        const dash=k.indexOf('-');
+        const cat=dash>0?k.slice(0,dash):k;
+        catSet.add(cat);
+      });
+    });
+    const curCatVal=catSel.value;
+    catSel.innerHTML='<option value="">全部商品</option>'+
+      [...catSet].sort().map(cat=>`<option value="${cat}"${cat===curCatVal?' selected':''}>${cat}</option>`).join('');
+  }
+  const allLog=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
+  // 日期過濾：統一用 "YYYY-MM-DD" 字串比較，避免時區問題
+  function toDateStr(date){
+    // 轉成 YYYY-MM-DD 字串
+    const y=date.getFullYear();
+    const m=String(date.getMonth()+1).padStart(2,'0');
+    const d=String(date.getDate()).padStart(2,'0');
+    return y+'-'+m+'-'+d;
+  }
+  function twTodayStr(){
+    const now=new Date();
+    const tw=new Date(now.getTime()+8*60*60*1000);
+    return tw.getUTCFullYear()+'-'+String(tw.getUTCMonth()+1).padStart(2,'0')+'-'+String(tw.getUTCDate()).padStart(2,'0');
+  }
+  const todayStr=twTodayStr();
+
+  function parseEntryDateStr(e){
+    const raw=(e.date||'').trim();
+    if(!raw) return null;
+    // ISO timestamp（含T，從 Sheet 載入）：+8h 取台灣日期
+    if(raw.includes('T')){
+      const d=new Date(raw);
+      if(!isNaN(d)){
+        const tw=new Date(d.getTime()+8*60*60*1000);
+        return tw.getUTCFullYear()+'-'+String(tw.getUTCMonth()+1).padStart(2,'0')+'-'+String(tw.getUTCDate()).padStart(2,'0');
+      }
+      return null;
+    }
+    // 本機格式 2026/3/14 或 2026-03-14 或 2026年3月14日
+    const m=raw.match(/(\d{4})[^\d]+(\d{1,2})[^\d]+(\d{1,2})/);
+    if(m) return m[1]+'-'+String(parseInt(m[2])).padStart(2,'0')+'-'+String(parseInt(m[3])).padStart(2,'0');
+    return null;
+  }
+  function inDateRange(e){
+    const ds=parseEntryDateStr(e);
+    if(!ds) return true;
+    if(activeDateMode==='today') return ds===todayStr;
+    if(activeDateMode==='yesterday'){
+      const y=new Date(new Date().getTime()+8*60*60*1000);
+      y.setUTCDate(y.getUTCDate()-1);
+      const ys=y.getUTCFullYear()+'-'+String(y.getUTCMonth()+1).padStart(2,'0')+'-'+String(y.getUTCDate()).padStart(2,'0');
+      return ds===ys;
+    }
+    if(activeDateMode==='week'){
+      const now=new Date(new Date().getTime()+8*60*60*1000);
+      const dow=now.getUTCDay()||7; // 1=Mon
+      const mon=new Date(now.getTime()-(dow-1)*86400000);
+      const monStr=mon.getUTCFullYear()+'-'+String(mon.getUTCMonth()+1).padStart(2,'0')+'-'+String(mon.getUTCDate()).padStart(2,'0');
+      return ds>=monStr&&ds<=todayStr;
+    }
+    if(activeDateMode==='month') return ds.slice(0,7)===todayStr.slice(0,7);
+    if(activeDateMode==='all') return true;
+    if(activeDateMode==='custom'){
+      if(activeDateFrom&&ds<activeDateFrom) return false;
+      if(activeDateTo&&ds>activeDateTo) return false;
+      return true;
+    }
+    return true;
+  }
+  // 更新副標題
+  const labelMap={today:'今日',yesterday:'昨日',week:'本週',month:'本月',all:'全部',custom:'自訂區間'};
+  document.getElementById('statsDateLabel').textContent=(labelMap[activeDateMode]||'')+'銷售概覽'+(activeCF?' · '+activeCF:'');
+
+  const activeRemark=document.getElementById('remarkFilter')?.value||'';
+  const productQtyFilterCat=document.getElementById('productQtyFilterCat')?.value||'';
+  const productQtyFilterNum=parseInt(document.getElementById('productQtyFilterNum')?.value)||0;
+
+  const log=allLog.filter(e=>{
+    if(!inDateRange(e)) return false;
+    if(activeCF&&(e.clinic||'')!==activeCF) return false;
+    if(activeRemark==='__none__') return !e.remark;
+    if(activeRemark&&(e.remark||'')!==activeRemark) return false;
+    // 商品數量篩選
+    if(productQtyFilterCat && productQtyFilterNum>0){
+      const qty=Object.entries(e.itemQty||{})
+        .filter(function([k]){ return k===productQtyFilterCat||k.startsWith(productQtyFilterCat+'-'); })
+        .reduce(function(s,[,v]){ return s+v; }, 0);
+      if(qty!==productQtyFilterNum) return false;
+    }
+    return true;
+  });
+  const rev=log.reduce((s,e)=>s+(e.total||0),0);
+  let tdr=0,tst=0,tnu=0,tph=0;
+  log.forEach(e=>{const cm=getEntryComm(e);tdr+=cm.dr;tst+=cm.st;tnu+=cm.nu;tph+=cm.ph;});
+
+  document.getElementById('statRev').textContent='NT$'+rev.toLocaleString();
+  document.getElementById('statOrders').textContent=log.length;
+  const cashRev=log.filter(e=>e.payMethod==='cash').reduce((s,e)=>s+(e.total||0),0);
+  const transferRev=log.filter(e=>e.payMethod!=='cash').reduce((s,e)=>s+(e.total||0),0);
+  const detailEl=document.getElementById('statRevDetail');
+  if(detailEl) detailEl.innerHTML=
+    '💵 現金 <strong>NT$'+cashRev.toLocaleString()+'</strong><br>'+
+    '🏦 轉帳 <strong>NT$'+transferRev.toLocaleString()+'</strong>';
+  document.getElementById('statDr').textContent='NT$'+tdr.toLocaleString();
+  document.getElementById('statSt').textContent='NT$'+tst.toLocaleString();
+  document.getElementById('statNu').textContent='NT$'+tnu.toLocaleString();
+  document.getElementById('statPh').textContent='NT$'+tph.toLocaleString();
+
+  // 表格動態欄：只顯示本次篩選範圍內有銷售的商品欄位
+  const statKeys=[];
+  log.forEach(e=>{
+    if(e.itemQty){Object.keys(e.itemQty).forEach(k=>{if(e.itemQty[k]>0&&!statKeys.includes(k))statKeys.push(k);});}
+    else if(e.items){e.items.split('、').forEach(part=>{const m=part.match(/^(.+?)×/);if(m&&!statKeys.includes(m[1].trim()))statKeys.push(m[1].trim());});}
+  });
+
+  // ── 商品銷售統計字卡 ──
+  // 取得商品主檔：用於識別 group（判斷是否有口味分類）
+  const allProducts=getAdminProducts();
+  // 建立 cat→group 對應
+  const catGroupMap={};
+  allProducts.forEach(p=>{ if(p.cat&&p.group) catGroupMap[p.cat]=p.group; });
+
+  // 彙總：key = "分類-口味" 或 "分類"
+  const prodTotals={}; // cat → { total, flavors:{name:qty} }
+  statKeys.forEach(k=>{
+    const qty=log.reduce((s,e)=>s+getQty(e,k),0);
+    if(!qty) return;
+    // k 格式：「蛋白代餐-草莓脆果」或「盒裝膠囊-好燃對策」或「好燃對策」
+    const dash=k.indexOf('-');
+    let cat,flavor;
+    if(dash>0){
+      cat=k.slice(0,dash);
+      flavor=k.slice(dash+1);
+    } else {
+      cat=k; flavor=null;
+    }
+    if(!prodTotals[cat]) prodTotals[cat]={total:0,flavors:{}};
+    prodTotals[cat].total+=qty;
+    if(flavor) prodTotals[cat].flavors[flavor]=(prodTotals[cat].flavors[flavor]||0)+qty;
+  });
+
+  // 顏色清單
+  const cardColors=['#4A9B8E','#6B8F71','#8E6B9B','#9B7B4A','#4A7B9B','#9B4A6B','#7B9B4A','#4A4A9B'];
+  const prodSummaryEl=document.getElementById('productSummaryGrid');
+  if(prodSummaryEl){
+    const entries=Object.entries(prodTotals).sort((a,b)=>b[1].total-a[1].total);
+    if(!entries.length){
+      prodSummaryEl.innerHTML='<div style="color:#aaa;font-size:12px;padding:8px;">無商品資料</div>';
+    } else {
+      prodSummaryEl.innerHTML=entries.map(([cat,data],ci)=>{
+        const color=cardColors[ci%cardColors.length];
+        const flavorEntries=Object.entries(data.flavors).sort((a,b)=>b[1]-a[1]);
+        const hasFlavors=flavorEntries.length>0;
+        const flavorHtml=hasFlavors
+          ?'<div style="margin-top:8px;border-top:1px solid rgba(0,0,0,.08);padding-top:8px;display:flex;flex-wrap:wrap;gap:4px;">'+
+            flavorEntries.map(([fl,qty])=>
+              '<span style="font-size:10px;background:rgba(0,0,0,.06);border-radius:6px;padding:2px 7px;white-space:nowrap;">'+fl+' <strong>'+qty+'</strong></span>'
+            ).join('')+'</div>'
+          :'';
+        return '<div style="background:#fff;border-radius:14px;padding:16px;border:1.5px solid #E8EEE9;box-shadow:0 2px 8px rgba(0,0,0,.06);">'+
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'+
+          '<div style="width:10px;height:10px;border-radius:50%;background:'+color+';flex-shrink:0;"></div>'+
+          '<div style="font-size:12px;font-weight:700;color:var(--charcoal);">'+cat+'</div>'+
+          '</div>'+
+          '<div style="font-size:28px;font-weight:900;color:'+color+';">'+data.total.toLocaleString()+'<span style="font-size:13px;font-weight:500;color:#888;margin-left:4px;">件</span></div>'+
+          flavorHtml+
+          '</div>';
+      }).join('');
+    }
+  }
+
+  // ── 商品銷售明細表 ──
+  // 蛋白代餐/Q飽：分7包一組(540/600)和7包以上(500/組)
+  const GROUP_SETS={
+    '蛋白代餐':{setSize:7, set1Price:540, set2Price:500},
+    'Q飽纖燃飲':{setSize:7, set1Price:600, set2Price:600, unitPrice:100}
+  };
+
+  // 每筆訂單計算各 cat 的包數和銷售額
+  const reportRows=[]; // 最終攤平的報表列
+
+  // 先彙總：群組商品用 cat，非群組用 name（商品名稱）
+  const catMap={};
+  log.forEach(e=>{
+    if(!e.itemQty) return;
+    Object.entries(e.itemQty).forEach(([k,qty])=>{
+      if(!qty) return;
+      const dash=k.indexOf('-');
+      const cat=dash>0?k.slice(0,dash):k;
+      const name=dash>0?k.slice(dash+1):k;
+      const isGroup=!!GROUP_SETS[cat];
+      // 群組商品用 cat 當 key，非群組用完整 name（cat-name 或 name）
+      const mapKey=isGroup?cat:k;
+      // 非群組且有分類（cat-name 格式）顯示為「分類-名稱」
+      const displayName=isGroup?cat:(dash>0?cat+'-'+name:name);
+
+      if(!catMap[mapKey]) catMap[mapKey]={
+        cat:displayName, isGroup,
+        totalQty:0, voucherQty:0,
+        set1Count:0, set1Qty:0,
+        set2Count:0, set2Qty:0,
+        voucherSet1Qty:0, voucherSet2Qty:0,
+        otherQty:0, otherRev:0,
+        voucherOtherQty:0,
+        flavors:{}, voucherFlavors:{}  // 口味統計
+      };
+      const isVoucher=(e.identity||'').includes('兌換券');
+      catMap[mapKey].totalQty+=qty;
+      if(isVoucher) catMap[mapKey].voucherQty+=qty;
+      // 口味統計（只有群組商品或有 dash 的才記）
+      if(dash>0){
+        const fl=name;
+        if(isVoucher){
+          catMap[mapKey].voucherFlavors[fl]=(catMap[mapKey].voucherFlavors[fl]||0)+qty;
+        } else {
+          catMap[mapKey].flavors[fl]=(catMap[mapKey].flavors[fl]||0)+qty;
+        }
+      }
+
+      if(isGroup){
+        catMap[mapKey].otherQty+=qty;
+        if(isVoucher) catMap[mapKey].voucherOtherQty+=qty;
+      } else {
+        const prod=allProducts.find(p=>p.name===name&&p.cat===cat)||allProducts.find(p=>p.name===name);
+        catMap[mapKey].otherQty+=qty;
+        if(!isVoucher) catMap[mapKey].otherRev+=(prod?.price||0)*qty;
+        if(isVoucher) catMap[mapKey].voucherOtherQty+=qty;
+      }
+    });
+
+    // 群組商品：按訂單計算組合
+    const isVoucher=(e.identity||'').includes('兌換券');
+    Object.keys(GROUP_SETS).forEach(grpCat=>{
+      const {setSize}=GROUP_SETS[grpCat];
+      const orderGrpQty=Object.entries(e.itemQty||{})
+        .filter(([k])=>k===grpCat||k.startsWith(grpCat+'-'))
+        .reduce((s,[,v])=>s+v,0);
+      if(!orderGrpQty||!catMap[grpCat]) return;
+      const sets=Math.floor(orderGrpQty/setSize);
+      if(sets===1){
+        catMap[grpCat].set1Count++; catMap[grpCat].set1Qty+=orderGrpQty; catMap[grpCat].otherQty-=orderGrpQty;
+        if(isVoucher){ catMap[grpCat].voucherSet1Qty+=orderGrpQty; catMap[grpCat].voucherOtherQty-=orderGrpQty; }
+      } else if(sets>1){
+        catMap[grpCat].set2Count++; catMap[grpCat].set2Qty+=orderGrpQty; catMap[grpCat].otherQty-=orderGrpQty;
+        if(isVoucher){ catMap[grpCat].voucherSet2Qty+=orderGrpQty; catMap[grpCat].voucherOtherQty-=orderGrpQty; }
+      }
+    });
+  });
+
+  // 計算銷售額（排除兌換券）
+  Object.values(catMap).forEach(r=>{
+    if(GROUP_SETS[r.cat]){
+      const {setSize,set1Price,set2Price}=GROUP_SETS[r.cat];
+      // 一般訂單（排除兌換券）
+      const normalSet1Qty=r.set1Qty-r.voucherSet1Qty;
+      const normalSet2Qty=r.set2Qty-r.voucherSet2Qty;
+      r.set1Rev=Math.round(normalSet1Qty/setSize)*set1Price;
+      let rev2=0;
+      if(normalSet2Qty>0){
+        rev2=log.reduce((s,e)=>{
+          const isVoucher=(e.identity||'').includes('兌換券');
+          if(isVoucher) return s;
+          const qty=Object.entries(e.itemQty||{})
+            .filter(([k])=>k===r.cat||k.startsWith(r.cat+'-'))
+            .reduce((a,[,v])=>a+v,0);
+          const sets=Math.floor(qty/setSize);
+          if(sets>1) return s+sets*set2Price; // Q飽 set2Price=600，蛋白代餐=500
+          return s;
+        },0);
+      }
+      // 散包收入（不足一組的部分）
+      const normalOtherQty=Math.max(0,r.otherQty-r.voucherOtherQty);
+      const unitPriceForCat=GROUP_SETS[r.cat].unitPrice||0;
+      const otherRevFromUnit=normalOtherQty*unitPriceForCat;
+      r.otherRev=otherRevFromUnit;
+      r.set2Rev=rev2;
+      r.totalRev=r.set1Rev+r.set2Rev+r.otherRev;
+      // 兌換券組合收入（顯示用，實際為0）
+      r.voucherSet1Rev=Math.round(r.voucherSet1Qty/setSize)*set1Price;
+      r.voucherSet2Rev=log.reduce((s,e)=>{
+        const isVoucher=(e.identity||'').includes('兌換券');
+        if(!isVoucher) return s;
+        const qty=Object.entries(e.itemQty||{})
+          .filter(([k])=>k===r.cat||k.startsWith(r.cat+'-'))
+          .reduce((a,[,v])=>a+v,0);
+        const sets=Math.floor(qty/setSize);
+        if(sets>1) return s+sets*set2Price;
+        return s;
+      },0);
+      r.totalRev=r.set1Rev+r.set2Rev+r.otherRev;
+    } else {
+      r.totalRev=r.otherRev;
+    }
+  });
+
+  const reportHead=document.getElementById('productReportHead');
+  const reportBody=document.getElementById('productReportBody');
+  if(reportHead&&reportBody){
+    reportHead.innerHTML=`<tr>
+      <th style="white-space:nowrap;">商品名稱</th>
+      <th style="text-align:center;white-space:nowrap;">總數量</th>
+      <th style="white-space:nowrap;">明細</th>
+      <th style="text-align:right;white-space:nowrap;">銷售金額</th>
+    </tr>`;
+    const entries=Object.values(catMap).sort((a,b)=>b.totalQty-a.totalQty);
+    if(!entries.length){
+      reportBody.innerHTML='<tr class="empty-row"><td colspan="4">尚無資料</td></tr>';
+    } else {
+      reportBody.innerHTML=entries.map(r=>{
+        let detailHtml='';
+        if(GROUP_SETS[r.cat]){
+          const {setSize,set1Price,set2Price}=GROUP_SETS[r.cat];
+          const parts=[];
+          const normalSet1Qty=r.set1Qty-r.voucherSet1Qty;
+          const normalSet2Qty=r.set2Qty-r.voucherSet2Qty;
+          if(normalSet1Qty>0) parts.push(
+            `<span style="font-size:11px;">▪ 7包組合（NT$${set1Price}/組）：`+
+            `<strong>${Math.round(normalSet1Qty/setSize)}組 / ${normalSet1Qty}包</strong>`+
+            ` → NT$${r.set1Rev.toLocaleString()}</span>`
+          );
+          if(r.voucherSet1Qty>0) parts.push(
+            `<span style="font-size:11px;color:#E65100;">▪ 🎫 兌換券 7包組合：`+
+            `<strong>${Math.round(r.voucherSet1Qty/setSize)}組 / ${r.voucherSet1Qty}包</strong>`+
+            ` （原價NT$${r.voucherSet1Rev.toLocaleString()}，實收NT$0）</span>`
+          );
+          if(normalSet2Qty>0){
+            const sets2total=log.reduce((s,e)=>{
+              const isV=(e.identity||'').includes('兌換券');
+              if(isV) return s;
+              const qty=Object.entries(e.itemQty||{}).filter(([k])=>k===r.cat||k.startsWith(r.cat+'-')).reduce((a,[,v])=>a+v,0);
+              return s+(Math.floor(qty/setSize)>1?1:0);
+            },0);
+            parts.push(
+              `<span style="font-size:11px;">▪ 7包以上（每組NT$${set2Price}）：`+
+              `<strong>${sets2total}筆 / ${normalSet2Qty}包</strong>`+
+              ` → NT$${r.set2Rev.toLocaleString()}</span>`
+            );
+          }
+          if(r.voucherSet2Qty>0){
+            const vSets2=log.reduce((s,e)=>{
+              const isV=(e.identity||'').includes('兌換券');
+              if(!isV) return s;
+              const qty=Object.entries(e.itemQty||{}).filter(([k])=>k===r.cat||k.startsWith(r.cat+'-')).reduce((a,[,v])=>a+v,0);
+              return s+(Math.floor(qty/setSize)>1?1:0);
+            },0);
+            parts.push(
+              `<span style="font-size:11px;color:#E65100;">▪ 🎫 兌換券 7包以上：`+
+              `<strong>${vSets2}筆 / ${r.voucherSet2Qty}包</strong>`+
+              ` （原價NT$${r.voucherSet2Rev.toLocaleString()}，實收NT$0）</span>`
+            );
+          }
+          if(r.otherQty>0){
+            const uPrice=GROUP_SETS[r.cat].unitPrice||0;
+            const normalOther=Math.max(0,r.otherQty-r.voucherOtherQty);
+            parts.push(
+              `<span style="font-size:11px;color:#aaa;">▪ 散包：${normalOther}包`+
+              (uPrice&&normalOther?` → NT$${(normalOther*uPrice).toLocaleString()}`:``) +
+              (r.voucherOtherQty?` / 🎫 兌換券 ${r.voucherOtherQty}包`:``)+
+              `</span>`
+            );
+          }
+          // 口味明細
+          const flavorEntries=Object.entries(r.flavors||{}).sort((a,b)=>b[1]-a[1]);
+          const vFlavorEntries=Object.entries(r.voucherFlavors||{}).sort((a,b)=>b[1]-a[1]);
+          if(flavorEntries.length){
+            parts.push('<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px;">'+
+              flavorEntries.map(([fl,q])=>`<span style="font-size:10px;background:#F0F5F1;border-radius:5px;padding:1px 6px;">${fl} <b>${q}</b></span>`).join('')+
+            '</div>');
+          }
+          if(vFlavorEntries.length){
+            parts.push('<div style="margin-top:2px;display:flex;flex-wrap:wrap;gap:3px;">'+
+              '<span style="font-size:10px;color:#E65100;">🎫</span>'+
+              vFlavorEntries.map(([fl,q])=>`<span style="font-size:10px;background:#FFF3E0;border-radius:5px;padding:1px 6px;color:#E65100;">${fl} <b>${q}</b></span>`).join('')+
+            '</div>');
+          }
+          detailHtml=parts.join('<br>');
+        } else {
+          const normalQty=r.totalQty-r.voucherQty;
+          detailHtml=(normalQty>0?`<span style="font-size:11px;color:#888;">${normalQty} 件</span>`:'')+
+            (r.voucherQty>0?`<span style="font-size:11px;color:#E65100;margin-left:6px;">🎫 兌換券 ${r.voucherQty} 件</span>`:'');
+        }
+        return `<tr>
+          <td style="font-weight:700;white-space:nowrap;">${r.cat}</td>
+          <td style="text-align:center;font-size:18px;font-weight:900;color:var(--sage);">${r.totalQty}</td>
+          <td>${detailHtml}</td>
+          <td style="text-align:right;white-space:nowrap;font-weight:700;color:var(--brown);">NT$${r.totalRev.toLocaleString()}</td>
+        </tr>`;
+      }).join('');
+    }
+    window._productReportData=entries;
+  }
+
+  // 人員分潤摘要卡片
+  const commByPerson={};
+  const roleLabel={doctor:'醫師',staff:'櫃檯',nurse:'護理師',pharma:'藥師'};
+  log.forEach(e=>{
+    const cm=getEntryComm(e);
+    [['doctor',e.doctor,cm.dr],['staff',e.staff,cm.st],['nurse',e.nurse,cm.nu],['pharma',e.pharma,cm.ph]].forEach(([role,name,amt])=>{
+      if(!name) return;
+      const key=name+'|'+role;
+      if(!commByPerson[key]) commByPerson[key]={name,role,total:0,sales:0,cashSales:0,transferSales:0,orders:0};
+      commByPerson[key].total+=amt;
+      commByPerson[key].sales+=(e.total||0);
+      if(e.payMethod==='cash') commByPerson[key].cashSales+=(e.total||0);
+      else commByPerson[key].transferSales+=(e.total||0);
+      commByPerson[key].orders++;
+    });
+  });
+  const roleColor={doctor:'#4A9B8E',staff:'#6B8F71',nurse:'#8E6B9B',pharma:'#9B7B4A'};
+  const summaryEl=document.getElementById('commSummaryGrid');
+  if(summaryEl){
+    const entries=Object.values(commByPerson).sort((a,b)=>b.total-a.total);
+    if(entries.length===0){
+      summaryEl.innerHTML='<div style="color:#aaa;font-size:12px;padding:8px;">無分潤資料</div>';
+    } else {
+      summaryEl.innerHTML=entries.map(p=>`
+        <div style="background:#fff;border-radius:14px;padding:16px;border:1.5px solid #E8EEE9;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+            <div style="width:36px;height:36px;border-radius:50%;background:${roleColor[p.role]||'#6B8F71'};color:#fff;font-size:15px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${p.name.charAt(0)}</div>
+            <div>
+              <div style="font-size:14px;font-weight:700;color:var(--charcoal);">${p.name}</div>
+              <div style="font-size:10px;color:#aaa;margin-top:1px;">${roleLabel[p.role]||p.role} · ${p.orders}筆</div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="background:#F8FAF8;border-radius:8px;padding:7px 10px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <span style="font-size:11px;color:#888;font-weight:500;">銷售金額</span>
+                <span style="font-size:13px;font-weight:700;color:var(--charcoal);">NT$${p.sales.toLocaleString()}</span>
+              </div>
+              <div style="display:flex;gap:8px;font-size:10px;color:#888;">
+                <span>💵 現金 <strong style="color:#555;">NT$${p.cashSales.toLocaleString()}</strong></span>
+                <span>🏦 轉帳 <strong style="color:#555;">NT$${p.transferSales.toLocaleString()}</strong></span>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;background:${roleColor[p.role]||'#6B8F71'}18;border-radius:8px;padding:7px 10px;">
+              <span style="font-size:11px;color:#888;font-weight:500;">分潤</span>
+              <span style="font-size:15px;font-weight:900;color:${roleColor[p.role]||'#6B8F71'};">NT$${p.total.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>`).join('');
+    }
+  }
+
+  document.getElementById('statsHead').innerHTML=`<tr>
+<th class="col-fixed" style="left:0px;min-width:70px;">日期</th><th class="col-fixed" style="left:70px;min-width:60px;">時間</th><th class="col-fixed" style="left:130px;min-width:70px;white-space:nowrap;">院區</th><th class="col-fixed" style="left:200px;min-width:80px;">顧客</th><th class="col-fixed" style="left:280px;min-width:70px;white-space:nowrap;">病歷號</th><th class="col-fixed" style="left:350px;min-width:70px;">身份</th><th class="col-fixed" style="left:420px;min-width:70px;">備註</th><th class="col-fixed" style="left:490px;min-width:70px;">醫師</th><th class="col-fixed" style="left:560px;min-width:70px;">櫃檯</th><th class="col-fixed" style="left:630px;min-width:70px;">護理師</th><th class="col-fixed-last" style="left:700px;min-width:70px;">藥師</th>
+    ${statKeys.map(k=>`<th style="font-size:10px;white-space:nowrap;">${k}</th>`).join('')}
+    <th>金額</th><th>付款</th>
+    <th style="color:#7B6200;white-space:nowrap;">醫師抽成</th>
+    <th style="color:#7B6200;white-space:nowrap;">櫃檯抽成</th>
+    <th style="color:#7B6200;white-space:nowrap;">護理師抽成</th>
+    <th style="color:#7B6200;white-space:nowrap;">藥師抽成</th>
+  </tr>`;
+
+  function qCell(q){return q?`<td style="text-align:center;"><strong style="color:var(--sage);">${q}</strong></td>`:`<td style="text-align:center;color:#ddd;">—</td>`;}
+  function commCell(v){return v?`<td style="white-space:nowrap;text-align:right;color:var(--brown);">NT$${v.toLocaleString()}</td>`:`<td style="text-align:center;color:#ddd;">—</td>`;}
+
+  const tbody=document.getElementById('logBody');
+  if(!log.length){tbody.innerHTML=`<tr class="empty-row"><td colspan="${18+statKeys.length}">尚無銷售紀錄</td></tr>`;return;}
+  const rows=[...log].reverse().map(e=>{
+    const cm=getEntryComm(e);
+    return`<tr>
+      <td class="col-fixed" style="left:0px;white-space:nowrap;">${fmtDate(e.date)||""}</td>
+      <td class="col-fixed" style="left:70px;white-space:nowrap;">${fmtTime(e.time)||""}</td>
+      <td class="col-fixed" style="left:130px;"><span style="font-size:10px;background:var(--sage-pale);color:var(--sage);padding:2px 7px;border-radius:9px;font-weight:600;white-space:nowrap;">${e.clinic||"-"}</span></td>
+      <td class="col-fixed" style="left:200px;"><strong>${e.customer||""}</strong></td>
+      <td class="col-fixed" style="left:280px;white-space:nowrap;color:#888;font-size:11px;">${e.phone||"—"}</td>
+      <td class="col-fixed" style="left:350px;white-space:nowrap;">${e.identity?`<span style="font-size:10px;background:#FFF3E0;color:#E65100;padding:2px 8px;border-radius:9px;font-weight:600;">${e.identity}</span>`:`<span style="color:#ddd;">—</span>`}</td>
+      <td class="col-fixed" style="left:420px;white-space:nowrap;color:#666;font-size:11px;">${e.remark||"—"}</td>
+      <td class="col-fixed" style="left:490px;white-space:nowrap;">${e.doctor||"-"}</td>
+      <td class="col-fixed" style="left:560px;white-space:nowrap;">${e.staff||"-"}</td>
+      <td class="col-fixed" style="left:630px;white-space:nowrap;">${e.nurse||"-"}</td>
+      <td class="col-fixed-last" style="left:700px;white-space:nowrap;">${e.pharma||"-"}</td>
+      ${statKeys.map(k=>qCell(getQty(e,k))).join('')}
+      <td style="white-space:nowrap;"><strong style="color:var(--sage);">NT$${(e.total||0).toLocaleString()}</strong></td>
+      <td><span class="tag ${e.payMethod==='cash'?'tag-cash':'tag-transfer'}">${e.payMethod==='cash'?'現金':'轉帳'}</span></td>
+      ${commCell(cm.dr)}${commCell(cm.st)}${commCell(cm.nu)}${commCell(cm.ph)}
+    </tr>`;
+  });
+
+  // ── 加總列 ──
+  const totalQtyMap={};
+  statKeys.forEach(k=>{ totalQtyMap[k]=log.reduce((s,e)=>s+getQty(e,k),0); });
+  const totalAmount=log.reduce((s,e)=>s+(e.total||0),0);
+  const totalDr=log.reduce((s,e)=>s+getEntryComm(e).dr,0);
+  const totalSt=log.reduce((s,e)=>s+getEntryComm(e).st,0);
+  const totalNu=log.reduce((s,e)=>s+getEntryComm(e).nu,0);
+  const totalPh=log.reduce((s,e)=>s+getEntryComm(e).ph,0);
+  const fixedCols=11; // 日期~藥師共11欄
+  const sumRow=`<tr style="background:#F0F5F1;font-weight:700;border-top:2px solid var(--sage);">
+    <td class="col-fixed" colspan="${fixedCols}" style="left:0;text-align:right;padding:8px 12px;font-size:12px;color:var(--brown);background:#F0F5F1;">合計（${log.length} 筆）</td>
+    ${statKeys.map(k=>{
+      const tot=totalQtyMap[k];
+      return tot>0?`<td style="text-align:center;color:var(--sage);font-size:13px;">${tot}</td>`:`<td style="text-align:center;color:#ddd;">—</td>`;
+    }).join('')}
+    <td style="white-space:nowrap;color:var(--sage);font-size:13px;">NT$${totalAmount.toLocaleString()}</td>
+    <td></td>
+    <td style="white-space:nowrap;color:var(--brown);font-size:12px;">${totalDr?'NT$'+totalDr.toLocaleString():'—'}</td>
+    <td style="white-space:nowrap;color:var(--brown);font-size:12px;">${totalSt?'NT$'+totalSt.toLocaleString():'—'}</td>
+    <td style="white-space:nowrap;color:var(--brown);font-size:12px;">${totalNu?'NT$'+totalNu.toLocaleString():'—'}</td>
+    <td style="white-space:nowrap;color:var(--brown);font-size:12px;">${totalPh?'NT$'+totalPh.toLocaleString():'—'}</td>
+  </tr>`;
+
+  tbody.innerHTML=rows.join('')+sumRow;
+  setTimeout(syncStatsScroll, 50);
+}
+
+function clearLog(){
+  if(!confirm('清除本機銷售紀錄？\n（Google Sheet 的資料不受影響，可隨時重新從 Sheet 載入）'))return;
+  localStorage.setItem(SALES_KEY,'[]');
+  renderStats();
+  toast('🗑️ 本機紀錄已清除');
+}
 
 async function loadSalesFromSheet(){
   const u=gasUrl();
@@ -1740,8 +2668,8 @@ function promoTypeChanged(){
       <div class="form-group"><label style="font-size:11px;font-weight:700;">身份名稱（顯示在前台）</label><input class="fg-input" id="pm_memberLabel" value="${p.memberLabel||'VIP'}" placeholder="例：VIP、員工、特殊身份"></div>
       <div class="form-group"><label style="font-size:11px;font-weight:700;">折後百分比（九折填90）</label><input class="fg-input" type="number" id="pm_discountValue" value="${p.discountValue||90}" min="1" max="99"></div>
       <div class="form-group" style="grid-column:1/-1;">
-        <label style="font-size:11px;font-weight:700;">適用數量上限 <span style="font-weight:400;color:#888;">（選填；超過此數量則不套用折扣，例：填 7 → 14包以上不打折）</span></label>
-        <input class="fg-input" type="number" id="pm_maxQty" value="${p.maxQty||''}" min="0" placeholder="留空=不限">
+        <label style="font-size:11px;font-weight:700;">適用數量上限 <span style="font-weight:400;color:#888;">（選填；超過此數量不套用折扣，例：填 7 → 14包以上不打折）</span></label>
+        <input class="fg-input" type="number" id="pm_maxQty" value="${p.maxQty||''}" min="0" placeholder="留空 = 不限">
       </div>
       <div class="form-group" style="grid-column:1/-1;display:flex;align-items:center;gap:8px;">
         <input type="checkbox" id="pm_noComm" ${p.noComm?'checked':''} style="width:16px;height:16px;cursor:pointer;">
@@ -2196,7 +3124,7 @@ async function loadStaffData(){
         if(clinics.length){editClinics=clinics;localStorage.setItem(CLINIC_KEY,JSON.stringify(clinics));renderClinicChips();}
       }
       if(pmd.status==='ok'&&pmd.rows){
-        const promos=pmd.rows.map(r=>({...r,buyQty:Number(r.buyQty)||0,freeQty:Number(r.freeQty)||0,discountValue:Number(r.discountValue)||0}));
+        const promos=pmd.rows.map(r=>({...r,buyQty:Number(r.buyQty)||0,freeQty:Number(r.freeQty)||0,discountValue:Number(r.discountValue)||0,maxQty:Number(r.maxQty)||0}));
         localStorage.setItem(PROMO_KEY,JSON.stringify(promos));
         editPromos=promos;
       }
