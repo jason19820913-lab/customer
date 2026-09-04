@@ -694,7 +694,8 @@ document.addEventListener('DOMContentLoaded', async ()=>{
           discountValue:Number(r.discountValue)||0,
           active:String(r.active).toUpperCase()!=='FALSE',
           noComm:String(r.noComm).toUpperCase()==='TRUE',
-          noCommDoctor:String(r.noCommDoctor).toUpperCase()==='TRUE'
+          noCommDoctor:String(r.noCommDoctor).toUpperCase()==='TRUE',
+          maxQty:Number(r.maxQty)||0
         }));
         localStorage.setItem(PROMO_KEY, JSON.stringify(promos));
         console.info('[promos] 已同步促銷活動，共', promos.length, '項');
@@ -1318,13 +1319,25 @@ function buildItems(memberPromoOverride){
   memberPromos.forEach(memberPromo=>{
     if(memberPromo.type==='memberDiscount'){
       const pct=Number(memberPromo.discountValue)||100;
+      const maxQty=Number(memberPromo.maxQty)||0;
+      // 計算某 item 的數量（群組商品加總 cart 內同群組數量；單品從 cart 取）
+      const allProds=getProducts();
+      const itemQtyOf=i=>{
+        if(i.group) return allProds.filter(p=>p.group===i.group).reduce((s,p)=>s+(cart[p.id]||0),0);
+        if(i.pid) return cart[i.pid]||0;
+        return 0;
+      };
       const applicable=items.filter(i=>{
         if(i.isDiscount)return false;
         const scope=String(memberPromo.scope||'');
-        if(!scope||scope==='all') return true;
-        if(scope.startsWith('group:')) return i.group===scope.slice(6);
-        if(scope.startsWith('cat:')) return i.cat===scope.slice(4);
-        return false;
+        let inScope=false;
+        if(!scope||scope==='all') inScope=true;
+        else if(scope.startsWith('group:')) inScope=i.group===scope.slice(6);
+        else if(scope.startsWith('cat:')) inScope=i.cat===scope.slice(4);
+        if(!inScope) return false;
+        // 數量上限：超過就不套用
+        if(maxQty>0 && itemQtyOf(i)>maxQty) return false;
+        return true;
       });
       const base=applicable.reduce((s,i)=>s+i.price,0);
       const discount=Math.round(base*(1-pct/100));
@@ -2056,10 +2069,14 @@ async function doCheckout(){
     }
   });
 
+  // 備註「金醫師」→ 醫師分潤歸零
+  const NO_DOCTOR_COMM_REMARKS=['金醫師'];
+  const remarkNoDoctor=NO_DOCTOR_COMM_REMARKS.includes(remark);
+
   let cm;
   if(isNoComm){
     cm={dr:0,st:0,nu:0,ph:0};
-  } else if(isNoCommDoctor){
+  } else if(isNoCommDoctor||remarkNoDoctor){
     const raw=calcComm(itemsStr,false,hasStaff,hasNurse,hasPharma,actualPriceMap);
     cm={dr:0,st:raw.st,nu:raw.nu,ph:raw.ph};
   } else {
