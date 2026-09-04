@@ -912,7 +912,7 @@ function checkPin(){
   if(pinBuf===getPin()){
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('appShell').classList.add('visible');
-    initApp();
+    setTimeout(initApp, 30); // 讓瀏覽器先畫出畫面，再開始載入資料
   }else{
     document.getElementById('pinError').textContent='❌ PIN 碼錯誤，請重試';
     pinBuf='';updateDots();setTimeout(()=>document.getElementById('pinError').textContent='',2000);
@@ -924,7 +924,7 @@ function logout(){document.getElementById('loginScreen').classList.remove('hidde
 async function initApp(){
   // 立即用本機快取渲染，讓畫面先出現
   renderStats();
-  loadClinicData(); loadStaffData(); renderStaffLists();
+  loadClinicData(); loadStaffData(true); renderStaffLists();
   renderProductManager();
   loadPromoData(); loadCommData();
   renderRemarkChips();
@@ -1414,9 +1414,10 @@ function renderStats(){
   renderClinicFilterBtns();
   renderRemarkFilter();
   // 動態填入商品分類篩選選單
+  const _salesAll=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
   const catSel=document.getElementById('productQtyFilterCat');
   if(catSel){
-    const allLog=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
+    const allLog=_salesAll;
     const catSet=new Set();
     allLog.forEach(e=>{
       if(e.itemQty) Object.keys(e.itemQty).forEach(k=>{
@@ -1429,7 +1430,7 @@ function renderStats(){
     catSel.innerHTML='<option value="">全部商品</option>'+
       [...catSet].sort().map(cat=>`<option value="${cat}"${cat===curCatVal?' selected':''}>${cat}</option>`).join('');
   }
-  const allLog=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
+  const allLog=_salesAll;
   // 日期過濾：統一用 "YYYY-MM-DD" 字串比較，避免時區問題
   function toDateStr(date){
     // 轉成 YYYY-MM-DD 字串
@@ -3105,11 +3106,12 @@ let editStaffData={doctors:[],staff:[],nurses:[],pharmas:[]};
 const ROLE_INPUT={doctors:'newDoctorInput',staff:'newStaffInput',nurses:'newNurseInput',pharmas:'newPharmaInput'};
 const ROLE_LIST={doctors:'doctorList',staff:'staffList',nurses:'nurseList',pharmas:'pharmaList'};
 
-async function loadStaffData(){
+async function loadStaffData(localOnly){
   // 先用本機快取顯示，背景從 GAS 更新
   const s=localStorage.getItem(STAFF_KEY);
   if(s){const d=JSON.parse(s);editStaffData={doctors:[...(d.doctors||[])],staff:[...(d.staff||[])],nurses:[...(d.nurses||[])],pharmas:[...(d.pharmas||[])]};}
   renderStaffLists();
+  if(localOnly) return; // initApp 已統一抓 Sheet，這裡不重複打 GAS
   // 背景同步 GAS 最新資料
   if(gasUrl()){
     try{
