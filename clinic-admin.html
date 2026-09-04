@@ -370,8 +370,8 @@ tbody tr:hover td{background:var(--sage-pale);}
         <button class="clinic-filter-btn" onclick="filterDate('today',this)">今日</button>
         <button class="clinic-filter-btn" onclick="filterDate('yesterday',this)">昨日</button>
         <button class="clinic-filter-btn" onclick="filterDate('week',this)">本週</button>
-        <button class="clinic-filter-btn" onclick="filterDate('month',this)">本月</button>
-        <button class="clinic-filter-btn active" onclick="filterDate('all',this)">全部</button>
+        <button class="clinic-filter-btn active" onclick="filterDate('month',this)">本月</button>
+        <button class="clinic-filter-btn" onclick="filterDate('all',this)">全部</button>
       </div>
       <div style="display:flex;align-items:center;gap:4px;margin-left:4px;">
         <input type="date" id="dateFrom" style="font-size:11px;padding:3px 7px;border:1.5px solid #D0DEAD;border-radius:10px;font-family:inherit;color:var(--brown);outline:none;" onchange="filterDateCustom()">
@@ -1228,7 +1228,7 @@ function switchPage(p){
 
 // ── STATS ──
 let activeCF='';
-let activeDateMode='all'; // today/yesterday/week/month/all/custom
+let activeDateMode='month'; // 預設本月（避免一登入就渲染全部歷史訂單）
 let activeDateFrom='', activeDateTo='';
 
 function filterDate(mode, btn){
