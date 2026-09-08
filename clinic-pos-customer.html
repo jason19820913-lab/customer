@@ -1293,7 +1293,7 @@ function buildItems(memberPromoOverride){
       sub=`套組價NT$${bundlePromo.discountValue}×${q}`;
     }
 
-    items.push({emoji:p.emoji||'📦',name:p.name+(q>1?` x${q}`:''),sub,price,pid:p.id,group:p.group});
+    items.push({emoji:p.emoji||'📦',name:p.name+(q>1?` x${q}`:''),sub,price,pid:p.id,group:p.group,cat:p.cat});
   });
 
   // ── 全單折扣（percentDiscount / fixedDiscount）：最後統一處理 ──
@@ -1334,6 +1334,7 @@ function buildItems(memberPromoOverride){
         if(!scope||scope==='all') inScope=true;
         else if(scope.startsWith('group:')) inScope=i.group===scope.slice(6);
         else if(scope.startsWith('cat:')) inScope=i.cat===scope.slice(4);
+        else if(scope.startsWith('id:')){ const ids=scope.slice(3).split(',').map(x=>x.trim()); inScope=!!i.pid&&ids.includes(i.pid); }
         if(!inScope) return false;
         // 數量上限：超過就不套用
         if(maxQty>0 && itemQtyOf(i)>maxQty) return false;
