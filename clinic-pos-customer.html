@@ -601,14 +601,18 @@ function getPromos(){
 
 // 判斷商品是否符合某促銷活動的 scope
 function promoMatchesProduct(promo, product){
-  const scope=String(promo.scope||'').trim();
+  // 寬鬆解析：允許 id:m1 / id=m1 / id：m1 / 全形逗號 / 多餘空白；也允許直接填商品名稱
+  let scope=String(promo.scope||'').trim().replace(/[＝=：]/g,':').replace(/，/g,',').replace(/\s+/g,'');
   if(!scope||scope==='all')return true;
   if(scope.startsWith('group:'))return product.group===scope.slice(6);
+  if(scope.startsWith('cat:'))return product.cat===scope.slice(4);
   if(scope.startsWith('id:')){
-    const ids=scope.slice(3).split(',').map(x=>x.trim());
-    return ids.includes(product.id);
+    const ids=scope.slice(3).split(',').filter(Boolean);
+    return ids.includes(String(product.id))||ids.includes(String(product.name||'').trim());
   }
-  return false;
+  // 沒有前綴：當作商品 id 或名稱清單
+  const ids=scope.split(',').filter(Boolean);
+  return ids.includes(String(product.id))||ids.includes(String(product.name||'').trim());
 }
 
 function renderClinicSelect(){
@@ -1187,7 +1191,7 @@ function buildItems(memberPromoOverride){
       if(!sets) return;
       const fp=Number(mp.discountValue)||0;
       flatQty+=sets*N; flatPrice+=sets*fp;
-      flatParts.push(`${sets}組${N}包一口價NT$${fp}（${matched.filter(p=>cart[p.id]>0).map(p=>p.name).join('/')}）`);
+      flatParts.push(`${sets}組${N}包${mp.memberLabel||mp.name}（${matched.filter(p=>cart[p.id]>0).map(p=>p.name+'×'+cart[p.id]).join('、')}）`);
     });
     tot-=flatQty;
     const fla=ps.filter(p=>cart[p.id]>0).map(p=>`${p.name}×${cart[p.id]}`).join('、');
