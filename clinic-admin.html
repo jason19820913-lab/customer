@@ -2502,7 +2502,7 @@ function savePmModal(){
    促銷活動管理
    ══════════════════════════════════════════ */
 const PROMO_HEADERS=['id','name','type','scope','buyQty','freeQty','discountValue','active','startDate','endDate','memberLabel','staffPriceMap','noComm','noCommDoctor','maxQty'];
-const PROMO_TYPE_LABEL={buyNgetN:'🎁 買N送N',tieredBundle:'📊 階梯買N送N',fixedDiscount:'💰 固定折扣',percentDiscount:'📉 百分比折',bundle:'📦 套組定價',memberDiscount:'👤 身份折扣',staffPrice:'🏷️ 員工優惠價'};
+const PROMO_TYPE_LABEL={buyNgetN:'🎁 買N送N',tieredBundle:'📊 階梯買N送N',fixedDiscount:'💰 固定折扣',percentDiscount:'📉 百分比折',bundle:'📦 套組定價',memberDiscount:'👤 身份折扣',staffPrice:'🏷️ 員工優惠價',flatBundle:'🎯 組合一口價'};
 
 let editPromos=[];
 
@@ -2538,6 +2538,7 @@ function renderPromoList(){
           ${p.type==='buyNgetN'?` ／ 買${p.buyQty}送${p.freeQty}`:''}
           ${(p.type==='fixedDiscount'||p.type==='percentDiscount')?` ／ 折扣值：${p.discountValue}${p.type==='percentDiscount'?'%':'元'}`:''}
           ${p.type==='bundle'?` ／ 套組價：NT$${p.discountValue}`:''}
+          ${p.type==='flatBundle'?` ／ 身份「${p.memberLabel||''}」：${p.buyQty}包一口價 NT$${p.discountValue}`:''}
           ${p.startDate||p.endDate?` ／ 期間：${p.startDate||'--'}～${p.endDate||'--'}`:''}
         </div>
       </div>
@@ -2590,7 +2591,7 @@ let editingPromoIdx=-1;
 function openPromoModal(idx){
   editingPromoIdx=idx===undefined?-1:idx;
   const p=editingPromoIdx>=0?editPromos[editingPromoIdx]:{};
-  const types=['buyNgetN','tieredBundle','fixedDiscount','percentDiscount','bundle','memberDiscount','staffPrice'];
+  const types=['buyNgetN','tieredBundle','fixedDiscount','percentDiscount','bundle','memberDiscount','staffPrice','flatBundle'];
   document.getElementById('promoModalOverlay').classList.add('open');
   document.getElementById('promoModalBody').innerHTML=`
     <h3 style="margin:0 0 16px;">${editingPromoIdx>=0?'編輯':'新增'}促銷活動</h3>
@@ -2665,6 +2666,23 @@ function promoTypeChanged(){
     extra.innerHTML=`<div class="form-group" style="grid-column:1/-1;"><label style="font-size:11px;font-weight:700;">折後百分比（例：九折填90，八五折填85）</label><input class="fg-input" type="number" id="pm_discountValue" value="${p.discountValue||90}" min="1" max="99"></div>`;
   } else if(type==='bundle'){
     extra.innerHTML=`<div class="form-group" style="grid-column:1/-1;"><label style="font-size:11px;font-weight:700;">套組固定售價（元）</label><input class="fg-input" type="number" id="pm_discountValue" value="${p.discountValue||0}" min="0"></div>`;
+  } else if(type==='flatBundle'){
+    extra.innerHTML=`
+      <div class="form-group"><label style="font-size:11px;font-weight:700;">身份名稱（前台按鈕）</label><input class="fg-input" id="pm_memberLabel" value="${p.memberLabel||'近效期'}" placeholder="例：近效期"></div>
+      <div class="form-group"><label style="font-size:11px;font-weight:700;">組合包數（N）</label><input class="fg-input" type="number" id="pm_buyQty" value="${p.buyQty||7}" min="1"></div>
+      <div class="form-group"><label style="font-size:11px;font-weight:700;">整組一口價（NT$）</label><input class="fg-input" type="number" id="pm_discountValue" value="${p.discountValue||400}" min="0"></div>
+      <div style="grid-column:1/-1;font-size:10px;color:#888;line-height:1.7;">
+        適用範圍請填指定口味，例：<code>id:custom_123</code>（多個用逗號分隔）。<br>
+        前台按下此身份後，該口味每湊滿 N 包算一組一口價；不足 N 包的部分與其他口味照原本組合價計算。
+      </div>
+      <div class="form-group" style="grid-column:1/-1;display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="pm_noComm" ${p.noComm?'checked':''} style="width:16px;height:16px;cursor:pointer;">
+        <label for="pm_noComm" style="font-size:12px;cursor:pointer;">選擇此身份時<strong>不計分潤</strong></label>
+      </div>
+      <div class="form-group" style="grid-column:1/-1;display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="pm_noCommDoctor" ${p.noCommDoctor?'checked':''} style="width:16px;height:16px;cursor:pointer;">
+        <label for="pm_noCommDoctor" style="font-size:12px;cursor:pointer;">選擇此身份時<strong>醫師欄位強制空白</strong></label>
+      </div>`;
   } else if(type==='memberDiscount'){
     extra.innerHTML=`
       <div class="form-group"><label style="font-size:11px;font-weight:700;">身份名稱（顯示在前台）</label><input class="fg-input" id="pm_memberLabel" value="${p.memberLabel||'VIP'}" placeholder="例：VIP、員工、特殊身份"></div>
