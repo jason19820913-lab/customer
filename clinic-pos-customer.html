@@ -1825,16 +1825,20 @@ function renderMemberDiscountBtns(){
 
 function toggleMemberLabel(label){
   const promos=getPromos().filter(p=>p.type==='memberDiscount'||p.type==='staffPrice'||p.type==='flatBundle');
-  const ids=promos.filter(p=>(p.memberLabel||p.name).trim()===label).map(p=>p.id);
+  const labelPromos=promos.filter(p=>(p.memberLabel||p.name).trim()===label);
+  const ids=labelPromos.map(p=>p.id);
   const allSelected=ids.every(id=>selectedMemberPromoIds.has(id));
+  // 組合一口價（近效期類）可複選；顧客身份（VIP/員工/套組回診）彼此互斥
+  const isFlatLabel=labelPromos.length>0&&labelPromos.every(p=>p.type==='flatBundle');
 
-  // 互斥：先清空所有已選，再決定是否選新的
-  selectedMemberPromoIds.clear();
-  if(!allSelected){
-    // 點新身份 → 選中此身份的所有促銷
-    ids.forEach(id=>selectedMemberPromoIds.add(id));
+  if(isFlatLabel){
+    // 只切換自己，不影響其他已選
+    ids.forEach(id=>allSelected?selectedMemberPromoIds.delete(id):selectedMemberPromoIds.add(id));
+  } else {
+    // 清掉其他「顧客身份」的選擇（保留已選的一口價）
+    promos.filter(p=>p.type!=='flatBundle').forEach(p=>selectedMemberPromoIds.delete(p.id));
+    if(!allSelected) ids.forEach(id=>selectedMemberPromoIds.add(id));
   }
-  // 若 allSelected → 點同一個相當於取消，已清空
 
   // 更新所有按鈕樣式
   const labelGroups={};
