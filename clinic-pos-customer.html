@@ -1783,7 +1783,7 @@ function verifyPin(){
 let activeMutexRole='staff';
 
 function renderMemberDiscountBtns(){
-  const promos=getPromos().filter(p=>p.type==='memberDiscount'||p.type==='staffPrice');
+  const promos=getPromos().filter(p=>p.type==='memberDiscount'||p.type==='staffPrice'||p.type==='flatBundle');
   const area=document.getElementById('memberDiscountArea');
   const btns=document.getElementById('memberDiscountBtns');
   if(!area||!btns) return;
@@ -1791,7 +1791,7 @@ function renderMemberDiscountBtns(){
     // 檢查 localStorage 裡所有促銷（包括未啟用）
     try{
       const allPromos=JSON.parse(localStorage.getItem('clinicPromos')||'[]');
-      const memberPromos=allPromos.filter(p=>p.type==='memberDiscount');
+      const memberPromos=allPromos.filter(p=>p.type==='memberDiscount'||p.type==='staffPrice'||p.type==='flatBundle');
       if(memberPromos.length>0){
         // 有設定但可能過期或未啟用
         area.style.display='block';
@@ -1820,7 +1820,7 @@ function renderMemberDiscountBtns(){
 }
 
 function toggleMemberLabel(label){
-  const promos=getPromos().filter(p=>p.type==='memberDiscount'||p.type==='staffPrice');
+  const promos=getPromos().filter(p=>p.type==='memberDiscount'||p.type==='staffPrice'||p.type==='flatBundle');
   const ids=promos.filter(p=>(p.memberLabel||p.name).trim()===label).map(p=>p.id);
   const allSelected=ids.every(id=>selectedMemberPromoIds.has(id));
 
