@@ -1234,6 +1234,7 @@ function buildItems(memberPromoOverride){
     const tieredPromo=(!hasStaffPriceForGrp)?promos.find(pm=>pm.type==='tieredBundle'
       && ps.some(p=>promoMatchesProduct(pm,p))):null;
 
+    const priceFor=(tot)=>{
     let price,sub;
     if(hasStaffPriceForGrp && unitPrice>0){
       // 員工身份：每包員工單價，不套組合優惠
@@ -1285,11 +1286,16 @@ function buildItems(memberPromoOverride){
       sub=`散裝｜${fla}`;
     }
 
+    return {price,sub};
+    };
+    let {price,sub}=priceFor(tot);
+    let commPrice=price; // 分潤基準金額（預設 = 結帳金額）
     if(flatQty>0){
+      commPrice=priceFor(totAll).price; // 一口價組合仍以原本組合價計算分潤
       price=(tot>0?price:0)+flatPrice;
       sub=flatParts.join('＋')+(tot>0?'＋'+sub:'｜'+fla);
     }
-    items.push({emoji,name:`${label} x${totAll}包`,sub,price,group:grp});
+    items.push({emoji,name:`${label} x${totAll}包`,sub,price,commPrice,group:grp});
   });
 
   // ── 單品 ──
@@ -2092,7 +2098,8 @@ async function doCheckout(){
       const grpPs=products.filter(p=>p.group===it.group&&(cart[p.id]||0)>0);
       const grpTot=grpPs.reduce((s,p)=>s+(cart[p.id]||0),0);
       // 用原始商品金額（it.price）不扣除身份折扣，讓分潤按原價計算
-      const actualPerPack=grpTot>0?it.price/grpTot:0;
+      const basePrice=(it.commPrice!==undefined)?it.commPrice:it.price; // 一口價組合用原組合價算分潤
+      const actualPerPack=grpTot>0?basePrice/grpTot:0;
       grpPs.forEach(p=>{ actualPriceMap[p.id]=actualPerPack; });
     }
   });
