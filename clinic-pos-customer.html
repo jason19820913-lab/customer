@@ -1166,15 +1166,30 @@ function buildItems(memberPromoOverride){
   const discountLines=[];  // 折扣明細（fixedDiscount / percentDiscount）
   // 身份折扣：從 override 或全域 selectedMemberPromoIds 取得（支援多選）
   const activeMemberIds=memberPromoOverride!==undefined?(memberPromoOverride?new Set([memberPromoOverride]):new Set()):selectedMemberPromoIds;
-  const memberPromos=promos.filter(p=>activeMemberIds.has(p.id)&&(p.type==='memberDiscount'||p.type==='staffPrice'));
+  const memberPromos=promos.filter(p=>activeMemberIds.has(p.id)&&(p.type==='memberDiscount'||p.type==='staffPrice'||p.type==='flatBundle'));
 
   // ── 群組商品（protein / mct）：合計後套用買N送N ──
   ['protein','mct'].forEach(grp=>{
     const ps=products.filter(p=>p.group===grp);
-    const tot=ps.reduce((s,p)=>s+(cart[p.id]||0),0);
-    if(!tot)return;
+    const totAll=ps.reduce((s,p)=>s+(cart[p.id]||0),0);
+    if(!totAll)return;
+    let tot=totAll;
     const emoji=grp==='protein'?'🥛':'💧';
     const label=grp==='protein'?'蛋白代餐':'Q飽纖燃飲';
+
+    // ── 組合一口價（flatBundle）：指定口味湊滿 N 包，整組一口價；其餘包數照正常組合計價 ──
+    let flatQty=0, flatPrice=0; const flatParts=[];
+    memberPromos.filter(mp=>mp.type==='flatBundle'&&(Number(mp.buyQty)||0)>0).forEach(mp=>{
+      const matched=ps.filter(p=>promoMatchesProduct(mp,p));
+      if(!matched.length) return;
+      const mq=matched.reduce((s,p)=>s+(cart[p.id]||0),0);
+      const N=Number(mp.buyQty)||0, sets=Math.floor(mq/N);
+      if(!sets) return;
+      const fp=Number(mp.discountValue)||0;
+      flatQty+=sets*N; flatPrice+=sets*fp;
+      flatParts.push(`${sets}組${N}包一口價NT$${fp}（${matched.filter(p=>cart[p.id]>0).map(p=>p.name).join('/')}）`);
+    });
+    tot-=flatQty;
     const fla=ps.filter(p=>cart[p.id]>0).map(p=>`${p.name}×${cart[p.id]}`).join('、');
     // 若有 staffPrice 員工優惠價 且 defaultPrice=0，unitPrice 照舊（用 staffPrice 扣除）
     // 若有 staffPrice 且 defaultPrice>0，用員工優惠價計算買N送N
@@ -1266,7 +1281,11 @@ function buildItems(memberPromoOverride){
       sub=`散裝｜${fla}`;
     }
 
-    items.push({emoji,name:`${label} x${tot}包`,sub,price,group:grp});
+    if(flatQty>0){
+      price=(tot>0?price:0)+flatPrice;
+      sub=flatParts.join('＋')+(tot>0?'＋'+sub:'｜'+fla);
+    }
+    items.push({emoji,name:`${label} x${totAll}包`,sub,price,group:grp});
   });
 
   // ── 單品 ──
