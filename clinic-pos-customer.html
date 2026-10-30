@@ -1170,7 +1170,7 @@ function buildItems(memberPromoOverride){
   const discountLines=[];  // 折扣明細（fixedDiscount / percentDiscount）
   // 身份折扣：從 override 或全域 selectedMemberPromoIds 取得（支援多選）
   const activeMemberIds=memberPromoOverride!==undefined?(memberPromoOverride?new Set([memberPromoOverride]):new Set()):selectedMemberPromoIds;
-  const memberPromos=promos.filter(p=>activeMemberIds.has(p.id)&&(p.type==='memberDiscount'||p.type==='staffPrice'||p.type==='flatBundle'));
+  const memberPromos=promos.filter(p=>activeMemberIds.has(p.id)&&(p.type==='memberDiscount'||p.type==='staffPrice'||p.type==='flatBundle'||p.type==='nthDiscount'));
 
   // ── 群組商品（protein / mct）：合計後套用買N送N ──
   ['protein','mct'].forEach(grp=>{
@@ -1324,7 +1324,7 @@ function buildItems(memberPromoOverride){
     }
 
     // 找 nthDiscount（第N件折扣）：每 N 件中的第 N 件打折（例：每2件第2件八折）
-    const nthPromo=promos.find(pm=>pm.type==='nthDiscount' && promoMatchesProduct(pm,p) && (Number(pm.buyQty)||0)>=2 && (Number(pm.discountValue)||0)>0);
+    const nthPromo=memberPromos.find(pm=>pm.type==='nthDiscount' && promoMatchesProduct(pm,p) && (Number(pm.buyQty)||0)>=2 && (Number(pm.discountValue)||0)>0);
     if(nthPromo && !hasDiscount){
       const N=Number(nthPromo.buyQty), pct=Number(nthPromo.discountValue);
       const discounted=Math.floor(q/N);
@@ -1808,7 +1808,7 @@ function verifyPin(){
 let activeMutexRole='staff';
 
 function renderMemberDiscountBtns(){
-  const promos=getPromos().filter(p=>p.type==='memberDiscount'||p.type==='staffPrice'||p.type==='flatBundle');
+  const promos=getPromos().filter(p=>p.type==='memberDiscount'||p.type==='staffPrice'||p.type==='flatBundle'||p.type==='nthDiscount');
   const area=document.getElementById('memberDiscountArea');
   const btns=document.getElementById('memberDiscountBtns');
   if(!area||!btns) return;
@@ -1816,7 +1816,7 @@ function renderMemberDiscountBtns(){
     // 檢查 localStorage 裡所有促銷（包括未啟用）
     try{
       const allPromos=JSON.parse(localStorage.getItem('clinicPromos')||'[]');
-      const memberPromos=allPromos.filter(p=>p.type==='memberDiscount'||p.type==='staffPrice'||p.type==='flatBundle');
+      const memberPromos=allPromos.filter(p=>p.type==='memberDiscount'||p.type==='staffPrice'||p.type==='flatBundle'||p.type==='nthDiscount');
       if(memberPromos.length>0){
         // 有設定但可能過期或未啟用
         area.style.display='block';
@@ -1845,19 +1845,19 @@ function renderMemberDiscountBtns(){
 }
 
 function toggleMemberLabel(label){
-  const promos=getPromos().filter(p=>p.type==='memberDiscount'||p.type==='staffPrice'||p.type==='flatBundle');
+  const promos=getPromos().filter(p=>p.type==='memberDiscount'||p.type==='staffPrice'||p.type==='flatBundle'||p.type==='nthDiscount');
   const labelPromos=promos.filter(p=>(p.memberLabel||p.name).trim()===label);
   const ids=labelPromos.map(p=>p.id);
   const allSelected=ids.every(id=>selectedMemberPromoIds.has(id));
   // 組合一口價（近效期類）可複選；顧客身份（VIP/員工/套組回診）彼此互斥
-  const isFlatLabel=labelPromos.length>0&&labelPromos.every(p=>p.type==='flatBundle');
+  const isFlatLabel=labelPromos.length>0&&labelPromos.every(p=>p.type==='flatBundle'||p.type==='nthDiscount');
 
   if(isFlatLabel){
     // 只切換自己，不影響其他已選
     ids.forEach(id=>allSelected?selectedMemberPromoIds.delete(id):selectedMemberPromoIds.add(id));
   } else {
     // 清掉其他「顧客身份」的選擇（保留已選的一口價）
-    promos.filter(p=>p.type!=='flatBundle').forEach(p=>selectedMemberPromoIds.delete(p.id));
+    promos.filter(p=>p.type!=='flatBundle'&&p.type!=='nthDiscount').forEach(p=>selectedMemberPromoIds.delete(p.id));
     if(!allSelected) ids.forEach(id=>selectedMemberPromoIds.add(id));
   }
 
