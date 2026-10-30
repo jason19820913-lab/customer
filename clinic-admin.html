@@ -2669,10 +2669,11 @@ function promoTypeChanged(){
     extra.innerHTML=`<div class="form-group" style="grid-column:1/-1;"><label style="font-size:11px;font-weight:700;">套組固定售價（元）</label><input class="fg-input" type="number" id="pm_discountValue" value="${p.discountValue||0}" min="0"></div>`;
   } else if(type==='nthDiscount'){
     extra.innerHTML=`
+      <div class="form-group" style="grid-column:1/-1;"><label style="font-size:11px;font-weight:700;">身份名稱（前台結帳按鈕）</label><input class="fg-input" id="pm_memberLabel" value="${p.memberLabel||'第二件八折'}" placeholder="例：第二件八折"></div>
       <div class="form-group"><label style="font-size:11px;font-weight:700;">每幾件（N）</label><input class="fg-input" type="number" id="pm_buyQty" value="${p.buyQty||2}" min="2"></div>
       <div class="form-group"><label style="font-size:11px;font-weight:700;">第N件折數（八折填80）</label><input class="fg-input" type="number" id="pm_discountValue" value="${p.discountValue||80}" min="1" max="99"></div>
       <div style="grid-column:1/-1;font-size:10px;color:#888;line-height:1.7;">
-        例：每 2 件、填 80 → 同一商品第 2、4、6 件八折。適用範圍填 <code>id:商品ID</code> 或 <code>group:xxx</code>；不需選身份，加入購物車即自動套用。
+        例：每 2 件、填 80 → 同一商品第 2、4、6 件八折。適用範圍填 <code>id:商品ID</code> 或 <code>group:xxx</code>。<br>前台結帳時<strong>按下此身份按鈕才會套用</strong>，可與其他身份同時選。
       </div>`;
   } else if(type==='flatBundle'){
     extra.innerHTML=`
