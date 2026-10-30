@@ -1320,6 +1320,21 @@ function buildItems(memberPromoOverride){
     if(bundlePromo && !hasDiscount){
       price=bundlePromo.discountValue*q;
       sub=`套組價NT$${bundlePromo.discountValue}×${q}`;
+      hasDiscount=true;
+    }
+
+    // 找 nthDiscount（第N件折扣）：每 N 件中的第 N 件打折（例：每2件第2件八折）
+    const nthPromo=promos.find(pm=>pm.type==='nthDiscount' && promoMatchesProduct(pm,p) && (Number(pm.buyQty)||0)>=2 && (Number(pm.discountValue)||0)>0);
+    if(nthPromo && !hasDiscount){
+      const N=Number(nthPromo.buyQty), pct=Number(nthPromo.discountValue);
+      const discounted=Math.floor(q/N);
+      if(discounted>0){
+        const unitDisc=Math.round(p.price*pct/100);
+        const savings=(p.price-unitDisc)*discounted;
+        price=p.price*q-savings;
+        sub=`第${N}件${pct}折×${discounted}件 省NT$${savings}`;
+        hasDiscount=true;
+      }
     }
 
     items.push({emoji:p.emoji||'📦',name:p.name+(q>1?` x${q}`:''),sub,price,pid:p.id,group:p.group,cat:p.cat});
