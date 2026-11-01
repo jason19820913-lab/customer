@@ -855,6 +855,41 @@ function json(o) {
 // ── KEYS ──
 const SALES_KEY='clinicSalesLog',GS_KEY='gsUrl',PIN_KEY='adminPin',MGMT_PIN_KEY='mgmtPin',STAFF_KEY='clinicStaff',PRODUCTS_KEY='clinicProducts',CLINIC_KEY='clinicClinics',PROMO_KEY='clinicPromos',COMM_KEY='clinicCommRules',REMARK_KEY='clinicRemarks';
 const DEFAULT_REMARKS=['金醫師','猛健樂','胰妥讚4週','胰妥讚8週'];
+
+// ── 銷售紀錄儲存層：IndexedDB（容量大）+ 記憶體快取；localStorage 只當舊資料遷移來源 ──
+let _salesCache=null;
+function _idbOpen(){
+  return new Promise((res,rej)=>{
+    const rq=indexedDB.open('clinicPosDB',1);
+    rq.onupgradeneeded=e=>{ e.target.result.createObjectStore('kv'); };
+    rq.onsuccess=e=>res(e.target.result);
+    rq.onerror=e=>rej(e.target.error);
+  });
+}
+async function _idbGet(k){
+  try{ const db=await _idbOpen(); return await new Promise((res,rej)=>{ const t=db.transaction('kv','readonly').objectStore('kv').get(k); t.onsuccess=()=>res(t.result); t.onerror=()=>rej(t.error); }); }
+  catch(e){ return undefined; }
+}
+async function _idbSet(k,v){
+  const db=await _idbOpen();
+  return new Promise((res,rej)=>{ const tx=db.transaction('kv','readwrite'); tx.objectStore('kv').put(v,k); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); });
+}
+function getSalesLog(){ return _salesCache||[]; }
+async function setSalesLog(arr){
+  _salesCache=arr;
+  try{ await _idbSet(SALES_KEY,arr); }catch(e){ console.warn('[sales] IndexedDB 寫入失敗',e); }
+  try{ localStorage.removeItem(SALES_KEY); }catch(e){}
+}
+async function loadSalesCache(){
+  let arr=await _idbGet(SALES_KEY);
+  if(!Array.isArray(arr)){
+    // 從舊的 localStorage 遷移
+    try{ arr=JSON.parse(localStorage.getItem(SALES_KEY)||'[]'); }catch(e){ arr=[]; }
+    if(arr.length){ try{ await _idbSet(SALES_KEY,arr); localStorage.removeItem(SALES_KEY); }catch(e){} }
+  }
+  _salesCache=arr||[];
+  return _salesCache;
+}
 const DEFAULT_PIN='1234';
 
 // ── DEFAULT PRODUCTS ──
@@ -913,7 +948,7 @@ function checkPin(){
   if(pinBuf===getPin()){
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('appShell').classList.add('visible');
-    setTimeout(initApp, 30); // 讓瀏覽器先畫出畫面，再開始載入資料
+    loadSalesCache().then(()=>setTimeout(initApp,30)); // 讓瀏覽器先畫出畫面，再開始載入資料
   }else{
     document.getElementById('pinError').textContent='❌ PIN 碼錯誤，請重試';
     pinBuf='';updateDots();setTimeout(()=>document.getElementById('pinError').textContent='',2000);
@@ -1415,7 +1450,7 @@ function renderStats(){
   renderClinicFilterBtns();
   renderRemarkFilter();
   // 動態填入商品分類篩選選單
-  const _salesAll=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
+  const _salesAll=getSalesLog();
   const catSel=document.getElementById('productQtyFilterCat');
   if(catSel){
     const allLog=_salesAll;
@@ -1930,7 +1965,7 @@ function renderStats(){
 
 function clearLog(){
   if(!confirm('清除本機銷售紀錄？\n（Google Sheet 的資料不受影響，可隨時重新從 Sheet 載入）'))return;
-  localStorage.setItem(SALES_KEY,'[]');
+  setSalesLog([]);
   renderStats();
   toast('🗑️ 本機紀錄已清除');
 }
@@ -1978,8 +2013,8 @@ async function loadSalesFromSheet(){
         pharmaComm: Number(r['藥師抽成'])||0,
         idHash: r['身分證雜湊']||'',
       };
-    }).filter(e=>e.date||e.customer);
-    localStorage.setItem(SALES_KEY, JSON.stringify(entries));
+    }).filter(e=>e.date||e.customer).map(e=>{ Object.keys(e).forEach(k=>{ if(e[k]==='') delete e[k]; }); return e; });
+    await setSalesLog(entries);
     renderStats();
     statusEl.textContent=`✅ 已從 Sheet 載入 ${entries.length} 筆銷售紀錄`;
     toast('☁️ 已載入 '+entries.length+' 筆銷售紀錄');
@@ -2085,7 +2120,7 @@ async function adminLookup(mode){
     }catch(e){
       console.warn('Sheet 病歷號查詢失敗',e);
       statusEl.innerHTML='<span style="color:#E65100;">⚠️ Google Sheet 無法連線，改查本機資料...</span>';
-      const log=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
+      const log=getSalesLog();
       const fallback=log.filter(e=>(e.phone||'').trim()===chartNum);
       if(!fallback.length){
         statusEl.innerHTML=`<span style="color:var(--red);">❌ 本機亦查無病歷號「${chartNum}」的購買紀錄</span>`;
@@ -2104,7 +2139,7 @@ async function adminLookup(mode){
   const gsUrl2=gasUrl();
   let records=[],source='local';
   if(gsUrl2){try{const res=await fetch(`${gsUrl2}?action=query&idHash=${encodeURIComponent(hash)}`);const d=await res.json();if(d.status==='ok'&&Array.isArray(d.records)){records=d.records;source='sheets';}}catch(e){}}
-  if(source==='local'){const log=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');records=log.filter(e=>e.idHash===hash);}
+  if(source==='local'){const log=getSalesLog();records=log.filter(e=>e.idHash===hash);}
   if(!records.length){statusEl.innerHTML=`<span style="color:var(--red);">❌ 查無 ${maskId(raw)} 的購買紀錄</span>`;document.getElementById('adminPatientResult').style.display='none';return;}
   renderPatientResult(records, maskId(raw), 'id', source);
 }
