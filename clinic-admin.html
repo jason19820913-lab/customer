@@ -391,6 +391,8 @@ tbody tr:hover td{background:var(--sage-pale);}
       <div class="stat-card"><div class="stat-icon">💁</div><div class="stat-num" id="statSt">NT$ 0</div><div class="stat-label">櫃檯抽成</div></div>
       <div class="stat-card"><div class="stat-icon">👩‍⚕️</div><div class="stat-num" id="statNu">NT$ 0</div><div class="stat-label">護理師抽成</div></div>
       <div class="stat-card"><div class="stat-icon">💊</div><div class="stat-num" id="statPh">NT$ 0</div><div class="stat-label">藥師抽成</div></div>
+      <div class="stat-card"><div class="stat-icon">🏥</div><div class="stat-num" id="statClinicRev">NT$ 0</div><div class="stat-label">診所銷售營業額</div><div id="statClinicRevDetail" style="font-size:10px;color:#888;margin-top:4px;"></div></div>
+      <div class="stat-card"><div class="stat-icon">🏪</div><div class="stat-num" id="statPharmRev">NT$ 0</div><div class="stat-label">藥局銷售營業額</div><div id="statPharmRevDetail" style="font-size:10px;color:#888;margin-top:4px;"></div></div>
     </div>
     <div class="section-title" style="margin-top:20px;">
       <span>商品銷售統計</span>
@@ -1563,6 +1565,23 @@ function renderStats(){
   document.getElementById('statSt').textContent='NT$'+tst.toLocaleString();
   document.getElementById('statNu').textContent='NT$'+tnu.toLocaleString();
   document.getElementById('statPh').textContent='NT$'+tph.toLocaleString();
+  // 診所 / 藥局 銷售營業額：依結帳/分潤人員角色歸類
+  // 藥局 = 藥師有填；診所 = 櫃檯或護理師有填（同時有則兩邊都算，另標示）
+  let clinicRev=0,clinicN=0,pharmRev=0,pharmN=0,bothN=0,noneN=0;
+  log.forEach(e=>{
+    const isPharm=!!(e.pharma&&String(e.pharma).trim());
+    const isClinic=!!((e.staff&&String(e.staff).trim())||(e.nurse&&String(e.nurse).trim()));
+    const t=e.total||0;
+    if(isPharm){pharmRev+=t;pharmN++;}
+    if(isClinic){clinicRev+=t;clinicN++;}
+    if(isPharm&&isClinic)bothN++;
+    if(!isPharm&&!isClinic)noneN++;
+  });
+  document.getElementById('statClinicRev').textContent='NT$'+clinicRev.toLocaleString();
+  document.getElementById('statPharmRev').textContent='NT$'+pharmRev.toLocaleString();
+  const cEl=document.getElementById('statClinicRevDetail'),pEl=document.getElementById('statPharmRevDetail');
+  if(cEl)cEl.textContent=clinicN+' 筆'+(noneN?'（另 '+noneN+' 筆未填人員未歸類）':'');
+  if(pEl)pEl.textContent=pharmN+' 筆'+(bothN?'（'+bothN+' 筆同時含診所人員）':'');
 
   // 表格動態欄：只顯示本次篩選範圍內有銷售的商品欄位
   const statKeys=[];
