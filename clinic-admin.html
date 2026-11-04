@@ -432,6 +432,7 @@ tbody tr:hover td{background:var(--sage-pale);}
             style="font-size:11px;border:none;background:transparent;width:48px;color:var(--charcoal);font-family:inherit;"
             oninput="renderStats()">
         </div>
+        <button class="btn-sm" onclick="syncRecentSales(false)" title="只抓今天的新訂單，秒回">🔄 更新今日</button>
         <button class="btn-sm" onclick="loadSalesFromSheet()" style="background:var(--sage);color:#fff;border-color:var(--sage);">☁️ 從 Sheet 載入</button>
         <button class="btn-sm" onclick="clearLog()">🗑️ 清除本機</button>
       </div>
@@ -950,7 +951,7 @@ function checkPin(){
   if(pinBuf===getPin()){
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('appShell').classList.add('visible');
-    loadSalesCache().then(()=>setTimeout(initApp,30)); // 讓瀏覽器先畫出畫面，再開始載入資料
+    loadSalesCache().then(()=>{ setTimeout(initApp,30); setTimeout(()=>syncRecentSales(true),1500); }); // 讓瀏覽器先畫出畫面，再開始載入資料
   }else{
     document.getElementById('pinError').textContent='❌ PIN 碼錯誤，請重試';
     pinBuf='';updateDots();setTimeout(()=>document.getElementById('pinError').textContent='',2000);
@@ -1987,6 +1988,58 @@ function clearLog(){
   setSalesLog([]);
   renderStats();
   toast('🗑️ 本機紀錄已清除');
+}
+
+// Sheet 一列 → entry（與 loadSalesFromSheet 相同規則）
+function sheetRowToEntry(r){
+  const FIXED=['日期','時間','院區','顧客姓名','身分證遮罩','病歷號','顧客身份','備註','當班醫師','櫃檯人員','護理師','藥師','結帳金額','付款方式','醫師抽成','櫃檯抽成','護理師抽成','藥師抽成','身分證雜湊'];
+  const itemQty={},itemParts=[];
+  Object.keys(r).forEach(k=>{ if(FIXED.includes(k))return; const q=Number(r[k])||0; if(q>0){itemQty[k]=q;itemParts.push(k+'×'+q);} });
+  const e={
+    date:r['日期']||'',time:r['時間']||'',clinic:r['院區']||'',customer:r['顧客姓名']||'',
+    idMask:r['身分證遮罩']||'',phone:r['病歷號']||'',doctor:r['當班醫師']||'',staff:r['櫃檯人員']||'',
+    nurse:r['護理師']||'',pharma:r['藥師']||'',identity:r['顧客身份']||'',remark:r['備註']||'',
+    items:itemParts.join('、'),itemQty,total:Number(r['結帳金額'])||0,
+    payMethod:(r['付款方式']==='現金'||r['付款方式']==='cash')?'cash':'transfer',
+    doctorComm:Number(r['醫師抽成'])||0,staffComm:Number(r['櫃檯抽成'])||0,
+    nurseComm:Number(r['護理師抽成'])||0,pharmaComm:Number(r['藥師抽成'])||0,
+    idHash:r['身分證雜湊']||'',
+  };
+  Object.keys(e).forEach(k=>{ if(e[k]==='') delete e[k]; });
+  return e;
+}
+// 訂單指紋：用來判斷是否已存在（避免重複）
+function entryKey(e){
+  const d=String(e.date||'').slice(0,10), t=String(e.time||'');
+  return [d,t,e.clinic||'',e.customer||'',e.phone||'',e.total||0,e.items||''].join('|');
+}
+// 台灣今天 YYYY-MM-DD
+function twTodayKey(){ const tw=new Date(Date.now()+8*3600*1000); return tw.getUTCFullYear()+'-'+String(tw.getUTCMonth()+1).padStart(2,'0')+'-'+String(tw.getUTCDate()).padStart(2,'0'); }
+function entryDateKey(e){
+  const raw=String(e.date||'').trim(); if(!raw)return '';
+  if(raw.includes('T')){ const d=new Date(raw); if(isNaN(d))return ''; const tw=new Date(d.getTime()+8*3600*1000); return tw.getUTCFullYear()+'-'+String(tw.getUTCMonth()+1).padStart(2,'0')+'-'+String(tw.getUTCDate()).padStart(2,'0'); }
+  const m=raw.match(/(\d{4})[^\d]+(\d{1,2})[^\d]+(\d{1,2})/); return m?m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0'):'';
+}
+// 增量同步：只合併「今天」的新訂單（Sheet + 本機 localStorage），不重抓全部
+let _syncingRecent=false;
+async function syncRecentSales(silent=true){
+  if(_syncingRecent) return; _syncingRecent=true;
+  try{
+    const cur=getSalesLog(); const seen=new Set(cur.map(entryKey)); const today=twTodayKey();
+    let added=0;
+    // a) 同台裝置前台剛結帳的本機紀錄
+    try{ const loc=JSON.parse(localStorage.getItem(SALES_KEY)||'[]'); loc.forEach(e=>{ const k=entryKey(e); if(!seen.has(k)){cur.push(e);seen.add(k);added++;} }); }catch(e){}
+    // b) Sheet 今天的新訂單
+    if(gasUrl()){
+      const d=await gasRead('銷售紀錄');
+      if(d&&d.status==='ok'&&Array.isArray(d.rows)){
+        d.rows.forEach(r=>{ const e=sheetRowToEntry(r); if(entryDateKey(e)!==today) return; const k=entryKey(e); if(!seen.has(k)){cur.push(e);seen.add(k);added++;} });
+      }
+    }
+    if(added>0){ await setSalesLog(cur); if(document.getElementById('pageStats')?.classList.contains('active')) renderStats(); if(!silent) toast('🆕 新增 '+added+' 筆訂單'); }
+    return added;
+  }catch(e){ console.warn('[syncRecentSales]',e); return 0; }
+  finally{ _syncingRecent=false; }
 }
 
 async function loadSalesFromSheet(){
@@ -3369,7 +3422,7 @@ function json(o) {
 function toast(msg){const el=document.createElement('div');el.className='toast';el.textContent=msg;document.getElementById('toastWrap').appendChild(el);setTimeout(()=>el.remove(),3000);}
 
 // Auto-refresh
-setInterval(()=>{if(document.getElementById('appShell').classList.contains('visible')&&document.getElementById('pageStats').classList.contains('active'))renderStats();},30000);
+setInterval(()=>{if(document.getElementById('appShell').classList.contains('visible'))syncRecentSales(true);},30000);
 </script>
 
   <!-- Promo Modal -->
