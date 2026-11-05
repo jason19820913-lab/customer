@@ -890,7 +890,11 @@ async function loadSalesCache(){
     try{ arr=JSON.parse(localStorage.getItem(SALES_KEY)||'[]'); }catch(e){ arr=[]; }
     if(arr.length){ try{ await _idbSet(SALES_KEY,arr); localStorage.removeItem(SALES_KEY); }catch(e){} }
   }
-  _salesCache=arr||[];
+  // 去重（修正早期指紋不一致造成的重複）
+  const seen=new Set(); const dedup=[];
+  (arr||[]).forEach(e=>{ const k=entryKey(e); if(!seen.has(k)){seen.add(k);dedup.push(e);} });
+  if(dedup.length!==(arr||[]).length){ try{ await _idbSet(SALES_KEY,dedup); }catch(e){} }
+  _salesCache=dedup;
   return _salesCache;
 }
 const DEFAULT_PIN='1234';
@@ -2009,9 +2013,18 @@ function sheetRowToEntry(r){
   return e;
 }
 // 訂單指紋：用來判斷是否已存在（避免重複）
+// 時間正規化成 24h "HH:MM"（支援 下午06:33 / 下午6:33 / 18:33 / ISO）
+function normTimeKey(v){
+  const s=String(v||'').trim(); if(!s)return '';
+  if(s.includes('T')){ const d=new Date(s); if(!isNaN(d)){ const tw=new Date(d.getTime()+8*3600*1000); return String(tw.getUTCHours()).padStart(2,'0')+':'+String(tw.getUTCMinutes()).padStart(2,'0'); } }
+  const m=s.match(/(上午|下午|AM|PM|am|pm)?\s*(\d{1,2})[:：](\d{2})/);
+  if(!m)return s;
+  let h=parseInt(m[2],10); const mi=m[3]; const ap=(m[1]||'').toLowerCase();
+  if(ap==='下午'||ap==='pm'){ if(h<12)h+=12; } else if(ap==='上午'||ap==='am'){ if(h===12)h=0; }
+  return String(h).padStart(2,'0')+':'+mi;
+}
 function entryKey(e){
-  const d=String(e.date||'').slice(0,10), t=String(e.time||'');
-  return [d,t,e.clinic||'',e.customer||'',e.phone||'',e.total||0,e.items||''].join('|');
+  return [entryDateKey(e),normTimeKey(e.time),(e.clinic||'').trim(),(e.customer||'').trim(),String(e.phone||'').trim(),e.total||0,(e.items||'').trim()].join('|');
 }
 // 台灣今天 YYYY-MM-DD
 function twTodayKey(){ const tw=new Date(Date.now()+8*3600*1000); return tw.getUTCFullYear()+'-'+String(tw.getUTCMonth()+1).padStart(2,'0')+'-'+String(tw.getUTCDate()).padStart(2,'0'); }
@@ -3423,6 +3436,18 @@ function toast(msg){const el=document.createElement('div');el.className='toast';
 
 // Auto-refresh
 setInterval(()=>{if(document.getElementById('appShell').classList.contains('visible'))syncRecentSales(true);},30000);
+// 前台結帳即時推播：同一台電腦上的前台結帳後，後台立刻顯示
+try{
+  const _bc=new BroadcastChannel('clinicPosOrders');
+  _bc.onmessage=async ev=>{
+    const msg=ev.data||{}; if(msg.type!=='newOrder'||!msg.entry) return;
+    const cur=getSalesLog(); const k=entryKey(msg.entry);
+    if(cur.some(e=>entryKey(e)===k)) return;
+    cur.push(msg.entry); await setSalesLog(cur);
+    if(document.getElementById('pageStats')?.classList.contains('active')) renderStats();
+    toast('🆕 新訂單：'+(msg.entry.customer||'')+' NT$'+(msg.entry.total||0).toLocaleString());
+  };
+}catch(e){}
 </script>
 
   <!-- Promo Modal -->
