@@ -2148,6 +2148,8 @@ async function doCheckout(){
   const log=JSON.parse(localStorage.getItem(SALES_KEY)||'[]');
   log.push(entry);
   localStorage.setItem(SALES_KEY,JSON.stringify(log));
+  // 通知同一台電腦上開著的後台：立即顯示這筆訂單
+  try{ new BroadcastChannel('clinicPosOrders').postMessage({type:'newOrder',entry}); }catch(e){}
 
   // 建收據（全螢幕 overlay，不用新視窗避免被瀏覽器封鎖）
   const itemRowsHtml=items.map(function(it){
