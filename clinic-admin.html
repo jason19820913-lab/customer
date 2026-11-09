@@ -2024,7 +2024,11 @@ function normTimeKey(v){
   return String(h).padStart(2,'0')+':'+mi;
 }
 function entryKey(e){
-  return [entryDateKey(e),normTimeKey(e.time),(e.clinic||'').trim(),(e.customer||'').trim(),String(e.phone||'').trim(),e.total||0,(e.items||'').trim()].join('|');
+  // 品項用 itemQty 排序後組成，避免前台/Sheet 順序不同造成誤判
+  const q=e.itemQty&&typeof e.itemQty==='object'
+    ? Object.keys(e.itemQty).filter(k=>Number(e.itemQty[k])>0).sort().map(k=>k.trim()+'='+Number(e.itemQty[k])).join(',')
+    : '';
+  return [entryDateKey(e),normTimeKey(e.time),(e.clinic||'').trim(),(e.customer||'').trim(),String(e.phone||'').trim(),Number(e.total)||0,q].join('|');
 }
 // 台灣今天 YYYY-MM-DD
 function twTodayKey(){ const tw=new Date(Date.now()+8*3600*1000); return tw.getUTCFullYear()+'-'+String(tw.getUTCMonth()+1).padStart(2,'0')+'-'+String(tw.getUTCDate()).padStart(2,'0'); }
